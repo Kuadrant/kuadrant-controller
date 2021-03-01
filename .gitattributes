@@ -1,3 +1,4 @@
 
 vendor/** linguist-vendored
 **/zz_generated.*.go linguist-generated=true
+hack/boilerplate.go.txt linguis-generated=true
