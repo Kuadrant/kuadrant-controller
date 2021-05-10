@@ -63,13 +63,21 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// APIProduct has been marked for deletion
-	if apip.GetDeletionTimestamp().IsZero() && controllerutil.ContainsFinalizer(&apip, finalizerName) {
+	if apip.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&apip, finalizerName) {
 		// cleanup the Ingress objects.
 		r.IngressProvider.Delete(ctx, apip)
 
 		//Remove finalizer and update the object.
 		controllerutil.RemoveFinalizer(&apip, finalizerName)
 		err := r.Client.Update(ctx, &apip)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	if !controllerutil.ContainsFinalizer(&apip, finalizerName) {
+		controllerutil.AddFinalizer(&apip, finalizerName)
+		err := r.Update(ctx, &apip)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -90,7 +98,7 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 	if ok {
-		// Set the APIProduct object ready.
+		// TODO(jmprusi): Set the APIProduct object ready.
 	}
 
 	return ctrl.Result{}, nil
