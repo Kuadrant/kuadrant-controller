@@ -97,6 +97,14 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	if !controllerutil.ContainsFinalizer(&apip, finalizerName) {
+		controllerutil.AddFinalizer(&apip, finalizerName)
+		err := r.Update(ctx, &apip)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Use the ingress provider to create the APIProduct.
 	// If it does exists, Update it.
 	err = r.IngressProvider.Create(ctx, apip)
