@@ -92,6 +92,9 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		err := r.Update(ctx, &apip)
 		log.Info("Adding finalizer", "error", err)
 		return ctrl.Result{Requeue: true}, err
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Use the ingress provider to create the APIProduct.
