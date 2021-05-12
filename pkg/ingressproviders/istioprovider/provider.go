@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
-
 	"github.com/go-logr/logr"
 	"github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 	"istio.io/api/networking/v1alpha3"
+	v1beta12 "istio.io/api/security/v1beta1"
+	v1beta13 "istio.io/api/type/v1beta1"
 	istio "istio.io/client-go/pkg/apis/networking/v1alpha3"
+	istioSecurity "istio.io/client-go/pkg/apis/security/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -33,19 +35,24 @@ import (
 )
 
 //TODO: move the const to a proper place, or get it from config
-const KuadrantNamespace = "kuadrant-system"
+const (
+	KuadrantNamespace             = "kuadrant-system"
+	KuadrantAuthorizationProvider = "kuadrant-authorization"
+)
 
 type IstioProvider struct {
 	Log       logr.Logger
 	K8sClient client.Client
 }
 
+// +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=virtualservices,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch
 
 func New(logger logr.Logger, client client.Client) *IstioProvider {
 	// Register the Istio Scheme into the client, so we can interact with istio objects.
 	utilruntime.Must(istio.AddToScheme(client.Scheme()))
+	utilruntime.Must(istioSecurity.AddToScheme(client.Scheme()))
 
 	// TODO: Create the gateway for Kuadrant
 	// TODO: Add the proper config to the mesh for the extAuthz.
@@ -69,6 +76,60 @@ func (is *IstioProvider) Create(ctx context.Context, apip v1beta1.APIProduct) er
 		err = is.K8sClient.Create(ctx, &virtualService)
 		if err != nil {
 			return fmt.Errorf("failing to create Istio virtualservice for %s: %w", apip.Name+environment.Name, err)
+		}
+
+		err = is.K8sClient.Get(ctx, types.NamespacedName{
+			Namespace: virtualService.Namespace,
+			Name:      virtualService.Name,
+		}, &virtualService)
+
+		reference := metav1.OwnerReference{
+			APIVersion: virtualService.APIVersion,
+			Kind:       virtualService.Kind,
+			Name:       virtualService.Name,
+			UID:        virtualService.UID,
+		}
+		if err != nil {
+			return err
+		}
+
+		authPolicy := istioSecurity.AuthorizationPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      apip.Name + apip.Namespace + environment.Name,
+				Namespace: KuadrantNamespace,
+			},
+			Spec: v1beta12.AuthorizationPolicy{
+				Selector: &v1beta13.WorkloadSelector{
+					MatchLabels: map[string]string{
+						"app": "istio-ingressgateway",
+					},
+				},
+				Rules: []*v1beta12.Rule{
+					{
+						To: []*v1beta12.Rule_To{{
+							Operation: &v1beta12.Operation{
+								Hosts: environment.Hosts,
+							},
+						}},
+					},
+				},
+				Action: v1beta12.AuthorizationPolicy_CUSTOM,
+				ActionDetail: &v1beta12.AuthorizationPolicy_Provider{
+					Provider: &v1beta12.AuthorizationPolicy_ExtensionProvider{
+						Name: KuadrantAuthorizationProvider,
+					},
+				},
+			},
+		}
+
+		ownerReferences := authPolicy.GetOwnerReferences()
+		ownerReferences = append(ownerReferences, reference)
+		authPolicy.SetOwnerReferences(ownerReferences)
+
+		err = is.K8sClient.Create(ctx, &authPolicy)
+		if err != nil {
+			return fmt.Errorf("failing to create Istio AuthorizationPolicy for %s: %w",
+				apip.Name+apip.Namespace+environment.Name, err)
 		}
 	}
 
@@ -191,7 +252,6 @@ func (is *IstioProvider) Update(ctx context.Context, apip v1beta1.APIProduct) er
 
 		virtualService.ResourceVersion = currentVS.ResourceVersion
 
-		log.Info("Istio Provider Update", "virtualservice", virtualService.GetName())
 		err = is.K8sClient.Update(ctx, &virtualService)
 		if err != nil {
 			return fmt.Errorf("failing to update Istio virtualservice for %s: %w", apip.Name+environment.Name, err)

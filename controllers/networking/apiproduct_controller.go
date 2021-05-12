@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/kuadrant/kuadrant-controller/pkg/authproviders"
+
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/kuadrant/kuadrant-controller/pkg/ingressproviders"
@@ -39,6 +41,7 @@ type APIProductReconciler struct {
 	Log             logr.Logger
 	Scheme          *runtime.Scheme
 	IngressProvider ingressproviders.IngressProvider
+	AuthProvider    authproviders.AuthProvider
 }
 
 const (
@@ -80,6 +83,8 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 
+		// cleanup the authorization objects.
+		r.AuthProvider.Delete(ctx, apip)
 		//Remove finalizer and update the object.
 		controllerutil.RemoveFinalizer(&apip, finalizerName)
 		err := r.Client.Update(ctx, &apip)
@@ -97,27 +102,16 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	if !controllerutil.ContainsFinalizer(&apip, finalizerName) {
-		controllerutil.AddFinalizer(&apip, finalizerName)
-		err := r.Update(ctx, &apip)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+	// Create or Update the Ingress using the provider
+	result, err := r.createOrUpdateIngress(ctx, apip)
+	if err != nil {
+		return result, err
 	}
 
-	// Use the ingress provider to create the APIProduct.
-	// If it does exists, Update it.
-	err = r.IngressProvider.Create(ctx, apip)
+	// Create or Update the Authorization objects using the provider
+	result, err = r.createOrUpdateAuth(ctx, apip)
 	if err != nil {
-		if errors.IsAlreadyExists(err) {
-			err = r.IngressProvider.Update(ctx, apip)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-		} else {
-			// unexpected error, raise it
-			return ctrl.Result{}, err
-		}
+		return result, err
 	}
 
 	// Check if the provider objects are set to Ready.
@@ -137,4 +131,32 @@ func (r *APIProductReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&networkingv1beta1.APIProduct{}).
 		Complete(r)
+}
+
+func (r *APIProductReconciler) createOrUpdateIngress(ctx context.Context, apip networkingv1beta1.APIProduct) (ctrl.Result, error) {
+	err := r.IngressProvider.Create(ctx, apip)
+
+	if err != nil && errors.IsAlreadyExists(err) {
+		err = r.IngressProvider.Update(ctx, apip)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else if err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *APIProductReconciler) createOrUpdateAuth(ctx context.Context, apip networkingv1beta1.APIProduct) (ctrl.Result, error) {
+	err := r.AuthProvider.Create(ctx, apip)
+
+	if err != nil && errors.IsAlreadyExists(err) {
+		err = r.AuthProvider.Update(ctx, apip)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else if err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
 }
