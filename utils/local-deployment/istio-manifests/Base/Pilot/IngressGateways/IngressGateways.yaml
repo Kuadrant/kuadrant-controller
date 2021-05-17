@@ -66,7 +66,7 @@ spec:
           - router
           - --domain
           - $(POD_NAMESPACE).svc.cluster.local
-          - --proxyLogLevel=warning
+          - --proxyLogLevel=debug
           - --proxyComponentLogLevel=misc:error
           - --log_output_level=default:info
           - --serviceCluster
@@ -323,33 +323,30 @@ metadata:
     install.operator.istio.io/owning-resource: unknown
     operator.istio.io/component: "IngressGateways"
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: istio-ingressgateway
     istio: kuadrant-system
   ports:
-    -
-      name: status-port
+    - name: status-port
       port: 15021
       protocol: TCP
       targetPort: 15021
-    -
-      name: http2
+    - name: http2
       port: 80
       protocol: TCP
       targetPort: 8080
-    -
-      name: https
+      nodePort: 30950
+    - name: https
       port: 443
       protocol: TCP
       targetPort: 8443
-    -
-      name: tcp-istiod
+      nodePort: 30951
+    - name: tcp-istiod
       port: 15012
       protocol: TCP
       targetPort: 15012
-    -
-      name: tls
+    - name: tls
       port: 15443
       protocol: TCP
       targetPort: 15443

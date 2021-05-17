@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 PROJECT_PATH := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
 
@@ -53,6 +55,8 @@ ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 test-integration: clean-cov generate fmt vet manifests
 	mkdir -p ${ENVTEST_ASSETS_DIR}
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
+	# Do not enable runnning specs in parallel. Current e2e tests expect single namespace with expected name "kuadrant-system"
+	# TODO: add support for running specs in parallel in several namespaces
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); USE_EXISTING_CLUSTER=true go test ./... -coverprofile $(PROJECT_PATH)/cover.out -tags integration -ginkgo.v -ginkgo.progress -v -timeout 0
 
 test-unit: clean-cov generate fmt vet manifests
