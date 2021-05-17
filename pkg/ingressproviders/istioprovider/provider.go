@@ -19,6 +19,7 @@ package istioprovider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
@@ -93,6 +94,13 @@ func (is *IstioProvider) Create(ctx context.Context, apip v1beta1.APIProduct) er
 			return err
 		}
 
+		var policyHosts []string
+		for _, host := range environment.Hosts {
+			if !strings.Contains(host, ":") {
+				host = host + ":*"
+			}
+			policyHosts = append(policyHosts, host)
+		}
 		authPolicy := istioSecurity.AuthorizationPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      apip.Name + apip.Namespace + environment.Name,
@@ -108,7 +116,7 @@ func (is *IstioProvider) Create(ctx context.Context, apip v1beta1.APIProduct) er
 					{
 						To: []*v1beta12.Rule_To{{
 							Operation: &v1beta12.Operation{
-								Hosts: environment.Hosts,
+								Hosts: policyHosts,
 							},
 						}},
 					},
@@ -250,6 +258,7 @@ func (is *IstioProvider) Update(ctx context.Context, apip v1beta1.APIProduct) er
 			return err
 		}
 
+		//TODO(jmprusi): Update authorizationPolicy too.
 		virtualService.ResourceVersion = currentVS.ResourceVersion
 
 		err = is.K8sClient.Update(ctx, &virtualService)

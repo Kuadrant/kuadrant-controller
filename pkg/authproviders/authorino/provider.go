@@ -2,6 +2,7 @@ package authorino
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/kuadrant/kuadrant-controller/pkg/ingressproviders/istioprovider"
 
@@ -44,9 +45,41 @@ func (a *AuthorinoProvider) Create(ctx context.Context, apip v1beta1.APIProduct)
 				Metadata:      nil,
 				Authorization: nil,
 			},
-			Status: authorino.ServiceStatus{
-				Ready: false,
-			},
+		}
+
+		for _, securityScheme := range apip.Spec.SecurityScheme {
+			identity := authorino.Identity{
+				Name:           securityScheme.Name,
+				Credentials:    authorino.Credentials{},
+				OAuth2:         nil,
+				Oidc:           nil,
+				APIKey:         nil,
+				KubernetesAuth: nil,
+			}
+
+			if securityScheme.APIKeyAuth != nil {
+				apikey := authorino.Identity_APIKey{}
+				found := false
+				for _, credentialSource := range environment.CredentialSources {
+					if credentialSource.Name == securityScheme.Name {
+						apikey.LabelSelectors = make(map[string]string)
+						for k, v := range credentialSource.APIKeyAuth.LabelSelectors {
+							apikey.LabelSelectors[k] = v
+						}
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("securityScheme credential source not found")
+				}
+				identity.Credentials.In = authorino.Credentials_In(securityScheme.APIKeyAuth.Location)
+				identity.Credentials.KeySelector = securityScheme.APIKeyAuth.Name
+				identity.APIKey = &apikey
+			} else if securityScheme.OpenIDConnectAuth != nil {
+				//TODO(jmprusi): Implement
+			}
+			service.Spec.Identity = append(service.Spec.Identity, &identity)
 		}
 
 		err := a.K8sClient.Create(ctx, &service)

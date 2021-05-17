@@ -9,6 +9,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+//TODO(jmprusi): I have doubts about how useful this interface is going to be, as it depends on the IngressProvider to
+//               be configured for this AuthProvider... Perhaps we should get rid of this.
+
 type AuthProvider interface {
 	Create(ctx context.Context, apip v1beta1.APIProduct) error
 	Update(ctx context.Context, apip v1beta1.APIProduct) error

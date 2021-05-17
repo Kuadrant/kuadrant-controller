@@ -84,7 +84,11 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		// cleanup the authorization objects.
-		r.AuthProvider.Delete(ctx, apip)
+		err = r.AuthProvider.Delete(ctx, apip)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
 		//Remove finalizer and update the object.
 		controllerutil.RemoveFinalizer(&apip, finalizerName)
 		err := r.Client.Update(ctx, &apip)
@@ -96,7 +100,6 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		controllerutil.AddFinalizer(&apip, finalizerName)
 		err := r.Update(ctx, &apip)
 		log.Info("Adding finalizer", "error", err)
-		return ctrl.Result{Requeue: true}, err
 		if err != nil {
 			return ctrl.Result{}, err
 		}
