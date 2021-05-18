@@ -57,13 +57,15 @@ func New(logger logr.Logger, client client.Client) *IstioProvider {
 }
 
 func (is *IstioProvider) Create(ctx context.Context, apip v1beta1.APIProduct) error {
-
+	log := is.Log.WithValues("apiproduct", client.ObjectKeyFromObject(&apip))
+	log.V(1).Info("Istio Provider Create")
 	for _, environment := range apip.Spec.Environments {
 		virtualService, err := is.environmentToVirtualService(ctx, apip, environment)
 		if err != nil {
 			return err
 		}
 
+		log.Info("Istio Provider Create", "virtualservice", virtualService.GetName())
 		err = is.K8sClient.Create(ctx, &virtualService)
 		if err != nil {
 			return fmt.Errorf("failing to create Istio virtualservice for %s: %w", apip.Name+environment.Name, err)
@@ -174,12 +176,22 @@ func (is *IstioProvider) Validate(apip v1beta1.APIProduct) error {
 }
 
 func (is *IstioProvider) Update(ctx context.Context, apip v1beta1.APIProduct) error {
+	log := is.Log.WithValues("apiproduct", client.ObjectKeyFromObject(&apip))
+	log.V(1).Info("Istio Provider Update")
 	for _, environment := range apip.Spec.Environments {
 		virtualService, err := is.environmentToVirtualService(ctx, apip, environment)
 		if err != nil {
 			return err
 		}
+		currentVS := &istio.VirtualService{}
+		err = is.K8sClient.Get(ctx, client.ObjectKeyFromObject(&virtualService), currentVS)
+		if err != nil {
+			return err
+		}
 
+		virtualService.ResourceVersion = currentVS.ResourceVersion
+
+		log.Info("Istio Provider Update", "virtualservice", virtualService.GetName())
 		err = is.K8sClient.Update(ctx, &virtualService)
 		if err != nil {
 			return fmt.Errorf("failing to update Istio virtualservice for %s: %w", apip.Name+environment.Name, err)
@@ -194,6 +206,8 @@ func (is *IstioProvider) Status(apip v1beta1.APIProduct) (bool, error) {
 }
 
 func (is *IstioProvider) Delete(ctx context.Context, apip v1beta1.APIProduct) error {
+	log := is.Log.WithValues("apiproduct", client.ObjectKeyFromObject(&apip))
+	log.V(1).Info("Istio Provider Delete")
 
 	for _, environment := range apip.Spec.Environments {
 		virtualService := istio.VirtualService{
@@ -202,6 +216,7 @@ func (is *IstioProvider) Delete(ctx context.Context, apip v1beta1.APIProduct) er
 				Namespace: KuadrantNamespace,
 			},
 		}
+		log.Info("Istio Provider Delete", "virtualservice", virtualService.GetName())
 		is.K8sClient.Delete(ctx, &virtualService)
 	}
 
