@@ -154,7 +154,7 @@ bundle-build:
 # Download kind locally if necessary
 KIND = $(shell pwd)/bin/kind
 kind:
-	$(call go-get-tool,$(KIND),sigs.k8s.io/kind@v0.9.0)
+	$(call go-get-tool,$(KIND),sigs.k8s.io/kind@v0.10.0)
 
 # Generates istio manifests with patches.
 .PHONY: generate-istio-manifests
