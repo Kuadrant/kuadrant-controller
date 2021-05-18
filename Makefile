@@ -161,6 +161,11 @@ kind:
 generate-istio-manifests:
 	istioctl manifest generate --set profile=minimal --set values.gateways.istio-ingressgateway.autoscaleEnabled=false --set values.pilot.autoscaleEnabled=false --set values.global.istioNamespace=kuadrant-system -f utils/local-deployment/patches/istio-externalProvider.yaml -o utils/local-deployment/istio-manifests
 
+.PHONY: istio-manifest-update-test
+istio-manifest-update-test: generate-istio-manifests
+	git diff --exit-code ./utils/local-deployment/istio-manifests
+	[ -z "$$(git ls-files --other --exclude-standard --directory --no-empty-directory ./utils/local-deployment/istio-manifests)" ]
+
 .PHONY: local-setup
 local-setup: kind local-cleanup manifests kustomize generate
 	./utils/local-deployment/local-setup.sh
