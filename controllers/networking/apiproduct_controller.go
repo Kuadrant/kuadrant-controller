@@ -18,6 +18,7 @@ package networking
 
 import (
 	"context"
+	"encoding/json"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -52,6 +53,7 @@ const (
 // move the current state of the cluster closer to the desired state.
 func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("apiproduct", req.NamespacedName)
+	log.Info("Reconciling APIProduct")
 
 	apip := networkingv1beta1.APIProduct{}
 	err := r.Client.Get(ctx, req.NamespacedName, &apip)
@@ -62,34 +64,49 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	if log.V(1).Enabled() {
+		jsonData, err := json.MarshalIndent(apip, "", "  ")
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		log.V(1).Info(string(jsonData))
+	}
+
 	// APIProduct has been marked for deletion
 	if apip.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&apip, finalizerName) {
 		// cleanup the Ingress objects.
-		r.IngressProvider.Delete(ctx, apip)
+		err = r.IngressProvider.Delete(ctx, apip)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
 		//Remove finalizer and update the object.
 		controllerutil.RemoveFinalizer(&apip, finalizerName)
 		err := r.Client.Update(ctx, &apip)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+		log.Info("Removing finalizer", "error", err)
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	if !controllerutil.ContainsFinalizer(&apip, finalizerName) {
 		controllerutil.AddFinalizer(&apip, finalizerName)
 		err := r.Update(ctx, &apip)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+		log.Info("Adding finalizer", "error", err)
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	// Use the ingress provider to create the APIProduct.
 	// If it does exists, Update it.
 	err = r.IngressProvider.Create(ctx, apip)
-	if err != nil && errors.IsAlreadyExists(err) {
-		r.IngressProvider.Update(ctx, apip)
-	} else {
-		return ctrl.Result{}, err
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			err = r.IngressProvider.Update(ctx, apip)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		} else {
+			// unexpected error, raise it
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Check if the provider objects are set to Ready.
