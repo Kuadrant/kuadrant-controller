@@ -231,8 +231,21 @@ func (is *IstioProvider) toVirtualServices(ctx context.Context, apip *networking
 		}
 
 		// TODO(jmprusi): All the OAS logic should be encapsulated into the API type.
+		wantedTag := networkingv1beta1.Tag{}
+		found := false
+		for _, tagInfo := range api.Spec.TAGs {
+			if tagInfo.Name == apiSel.Tag {
+				wantedTag = tagInfo
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("tag %s not found", apiSel.Tag)
+		}
+
 		loader := openapi3.Loader{Context: ctx}
-		doc, err := loader.LoadFromData([]byte(api.Spec.APIDefinition.OAS))
+		doc, err := loader.LoadFromData([]byte(wantedTag.APIDefinition.OAS))
 		if err != nil {
 			return nil, err
 		}

@@ -46,8 +46,7 @@ type SecurityRequirements []SecurityRequirement
 
 // APISpec defines the desired state of API
 type APISpec struct {
-	APIDefinition APIDefinition `json:"api_definition"`
-	TAGs          []Tag         `json:"tags"`
+	TAGs []Tag `json:"tags"`
 }
 
 type APIDefinition struct {
@@ -55,8 +54,9 @@ type APIDefinition struct {
 }
 
 type Tag struct {
-	Name        string      `json:"name"`
-	Destination Destination `json:"destination"`
+	Name          string        `json:"name"`
+	Destination   Destination   `json:"destination"`
+	APIDefinition APIDefinition `json:"api_definition"`
 }
 
 type SecurityScheme struct {

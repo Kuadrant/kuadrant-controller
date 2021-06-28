@@ -185,6 +185,11 @@ func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service core
 	if _, ok := oasConfigmap.Data["openapi.yaml"]; !ok {
 		return nil, fmt.Errorf("oas configmap is missing the openapispec.yaml entry")
 	}
+
+	Tag.APIDefinition = v1beta1.APIDefinition{
+		OAS: oasConfigmap.Data["openapi.yaml"],
+	}
+
 	// TODO(jmprusi): We will create the API object in the same namespace as the service to simplify the deletion,
 	// review this later.
 	desiredAPI := v1beta1.API{
@@ -193,9 +198,6 @@ func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service core
 			Namespace: service.Namespace,
 		},
 		Spec: v1beta1.APISpec{
-			APIDefinition: v1beta1.APIDefinition{
-				OAS: oasConfigmap.Data["openapi.yaml"],
-			},
 			TAGs: nil,
 		},
 	}
