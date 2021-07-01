@@ -84,25 +84,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	baseReconciler := reconcilers.NewBaseReconciler(
+	apiProductBaseReconciler := reconcilers.NewBaseReconciler(
 		mgr.GetClient(), mgr.GetScheme(), mgr.GetAPIReader(),
-		ctrl.Log.WithName("controllers").WithName("kuadrant"),
+		ctrl.Log.WithName("controllers").WithName("kuadrant").WithName("apiproduct"),
 		mgr.GetEventRecorderFor("APIProduct"),
 	)
 
+	serviceBaseReconciler := reconcilers.NewBaseReconciler(
+		mgr.GetClient(), mgr.GetScheme(), mgr.GetAPIReader(),
+		ctrl.Log.WithName("controllers").WithName("kuadrant").WithName("service"),
+		mgr.GetEventRecorderFor("Service"),
+	)
+
 	if err = (&networkingcontrollers.APIProductReconciler{
-		BaseReconciler:  baseReconciler,
-		AuthProvider:    authproviders.GetAuthProvider(baseReconciler),
-		IngressProvider: ingressproviders.GetIngressProvider(baseReconciler),
+		BaseReconciler:  apiProductBaseReconciler,
+		AuthProvider:    authproviders.GetAuthProvider(apiProductBaseReconciler),
+		IngressProvider: ingressproviders.GetIngressProvider(apiProductBaseReconciler),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "APIProduct")
 		os.Exit(1)
 	}
 
 	if err = (&discovery.ServiceReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("k8s.io.api").WithName("Service"),
-		Scheme: mgr.GetScheme(),
+		BaseReconciler: serviceBaseReconciler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
