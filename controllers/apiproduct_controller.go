@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 	"github.com/kuadrant/kuadrant-controller/pkg/authproviders"
@@ -68,11 +70,6 @@ func (r *APIProductReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 		log.V(1).Info(string(jsonData))
-	}
-
-	if apip.Status.Ready && apip.Status.ObservedGen == apip.GetGeneration() {
-		log.Info("nothing to be done")
-		return ctrl.Result{}, nil
 	}
 
 	// APIProduct has been marked for deletion
@@ -230,7 +227,15 @@ func (r *APIProductReconciler) getAPIUIDs(ctx context.Context, apip *networkingv
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *APIProductReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	apiEventMapper := &APIProductAPIEventMapper{
+		K8sClient: r.Client(),
+		Logger:    r.Logger().WithName("apiHandler"),
+	}
 	return ctrl.NewControllerManagedBy(mgr).
+		Watches(
+			&source.Kind{Type: &networkingv1beta1.API{}},
+			handler.EnqueueRequestsFromMapFunc(apiEventMapper.Map),
+		).
 		For(&networkingv1beta1.APIProduct{}).
 		Complete(r)
 }

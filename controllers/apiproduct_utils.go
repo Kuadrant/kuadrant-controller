@@ -29,6 +29,10 @@ const (
 	KuadrantAPILabelValue  = "true"
 )
 
+func apiLabelKey(uid string) string {
+	return fmt.Sprintf("%s%s", KuadrantAPILabelPrefix, uid)
+}
+
 func replaceAPILabels(apip *networkingv1beta1.APIProduct, desiredAPIUIDs []string) bool {
 	existingLabels := apip.GetLabels()
 
@@ -49,9 +53,8 @@ func replaceAPILabels(apip *networkingv1beta1.APIProduct, desiredAPIUIDs []strin
 
 	desiredAPILabels := map[string]string{}
 	for _, uid := range desiredAPIUIDs {
-		labelKey := fmt.Sprintf("%s%s", KuadrantAPILabelPrefix, uid)
-		desiredAPILabels[labelKey] = KuadrantAPILabelValue
-		existingLabels[labelKey] = KuadrantAPILabelValue
+		desiredAPILabels[apiLabelKey(uid)] = KuadrantAPILabelValue
+		existingLabels[apiLabelKey(uid)] = KuadrantAPILabelValue
 	}
 
 	apip.SetLabels(existingLabels)

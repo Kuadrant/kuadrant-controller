@@ -19,7 +19,6 @@ limitations under the License.
 package controllers
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -43,10 +42,10 @@ func TestReplaceAPILabels(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "apiproduct01",
 			Labels: map[string]string{
-				"app": "database",
-				fmt.Sprintf("%s%s", KuadrantAPILabelPrefix, uid1): KuadrantAPILabelValue,
-				fmt.Sprintf("%s%s", KuadrantAPILabelPrefix, uid2): KuadrantAPILabelValue,
-				fmt.Sprintf("%s%s", KuadrantAPILabelPrefix, uid3): KuadrantAPILabelValue,
+				"app":             "database",
+				apiLabelKey(uid1): KuadrantAPILabelValue,
+				apiLabelKey(uid2): KuadrantAPILabelValue,
+				apiLabelKey(uid3): KuadrantAPILabelValue,
 			},
 		},
 		Spec: networkingv1beta1.APIProductSpec{},
@@ -65,10 +64,10 @@ func TestReplaceAPILabels(t *testing.T) {
 	newLabels := apiProduct.GetLabels()
 
 	expectedLabels := map[string]string{
-		"app": "database",
-		fmt.Sprintf("%s%s", KuadrantAPILabelPrefix, uid2): KuadrantAPILabelValue,
-		fmt.Sprintf("%s%s", KuadrantAPILabelPrefix, uid3): KuadrantAPILabelValue,
-		fmt.Sprintf("%s%s", KuadrantAPILabelPrefix, uid4): KuadrantAPILabelValue,
+		"app":             "database",
+		apiLabelKey(uid2): KuadrantAPILabelValue,
+		apiLabelKey(uid3): KuadrantAPILabelValue,
+		apiLabelKey(uid4): KuadrantAPILabelValue,
 	}
 
 	if !reflect.DeepEqual(newLabels, expectedLabels) {
