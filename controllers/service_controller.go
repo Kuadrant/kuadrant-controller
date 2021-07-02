@@ -85,7 +85,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	err = r.ReconcileResource(ctx, &v1beta1.API{}, desiredAPI, alwaysUpdateService)
+	err = r.ReconcileResource(ctx, &v1beta1.API{}, desiredAPI, alwaysUpdateAPI)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -232,14 +232,14 @@ func onlyLabeledServices() predicate.Predicate {
 	}
 }
 
-func alwaysUpdateService(existingObj, desiredObj client.Object) (bool, error) {
-	existing, ok := existingObj.(*corev1.Service)
+func alwaysUpdateAPI(existingObj, desiredObj client.Object) (bool, error) {
+	existing, ok := existingObj.(*v1beta1.API)
 	if !ok {
-		return false, fmt.Errorf("%T is not a *corev1.Service", existingObj)
+		return false, fmt.Errorf("%T is not a *v1beta1.API", existingObj)
 	}
-	desired, ok := desiredObj.(*corev1.Service)
+	desired, ok := desiredObj.(*v1beta1.API)
 	if !ok {
-		return false, fmt.Errorf("%T is not a *corev1.Service", desiredObj)
+		return false, fmt.Errorf("%T is not a *v1beta1.API", desiredObj)
 	}
 
 	existing.Spec = desired.Spec
