@@ -20,12 +20,17 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+const (
+	APIProductKind = "APIProduct"
+)
 
 type OpenIDConnectAuth struct {
 	URL string `json:"url"`
@@ -62,10 +67,22 @@ type Mapping struct {
 }
 
 type APISelector struct {
-	Name      string  `json:"name"`
-	Namespace string  `json:"namespace"`
-	Tag       string  `json:"tag"`
-	Mapping   Mapping `json:"mapping,omitempty"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+
+	// +optional
+	Tag *string `json:"tag,omitempty"`
+
+	Mapping Mapping `json:"mapping,omitempty"`
+}
+
+func (a *APISelector) APINamespacedName() types.NamespacedName {
+	name := a.Name
+	if a.Tag != nil {
+		name = APIObjectName(a.Name, *a.Tag)
+	}
+
+	return types.NamespacedName{Namespace: a.Namespace, Name: name}
 }
 
 // APIProductSpec defines the desired state of APIProduct

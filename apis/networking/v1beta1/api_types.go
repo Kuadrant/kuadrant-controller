@@ -17,10 +17,12 @@ limitations under the License.
 package v1beta1
 
 import (
-	gatewayapiv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	"fmt"
 
 	apiextentionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	gatewayapiv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -29,9 +31,17 @@ import (
 // TODO: API definition is missing kubebuilder annotations for validation, add them.
 // TODO: Add proper comments for each of the API fields and Structs, so we can create proper docs.
 
+const (
+	APIKind = "API"
+)
+
 type Destination struct {
 	Schema                           string `json:"schema,omitempty"`
 	apiextentionsv1.ServiceReference `json:"serviceReference"`
+}
+
+func (d Destination) NamespacedName() types.NamespacedName {
+	return types.NamespacedName{Namespace: d.Namespace, Name: d.Name}
 }
 
 type APIMappings struct {
@@ -66,6 +76,10 @@ type API struct {
 
 	Spec   APISpec   `json:"spec,omitempty"`
 	Status APIStatus `json:"status,omitempty"`
+}
+
+func APIObjectName(base, tag string) string {
+	return fmt.Sprintf("%s.%s", base, tag)
 }
 
 // +kubebuilder:object:root=true
