@@ -197,17 +197,12 @@ func (is *IstioProvider) apiHTTPRoutes(ctx context.Context, apiSel *networkingv1
 		return nil, err
 	}
 
-	tag, ok := api.Spec.Tag(apiSel.Tag)
-	if !ok {
-		return nil, fmt.Errorf("tag %s not found in target API %s:%s", apiSel.Tag, apiSel.Namespace, apiSel.Name)
-	}
-
-	doc, err := openapi3.NewLoader().LoadFromData([]byte(tag.APIDefinition.OAS))
+	doc, err := openapi3.NewLoader().LoadFromData([]byte(*api.Spec.Mappings.OAS))
 	if err != nil {
 		return nil, err
 	}
 
-	return HTTPRoutesFromOAS(doc, apiSel.Mapping.Prefix, tag)
+	return HTTPRoutesFromOAS(doc, apiSel.Mapping.Prefix, api.Spec.Destination)
 }
 
 func (is *IstioProvider) Status(ctx context.Context, apip *networkingv1beta1.APIProduct) (bool, error) {

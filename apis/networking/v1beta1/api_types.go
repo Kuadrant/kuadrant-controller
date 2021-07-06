@@ -17,6 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	//gatewayapiv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+
+	apiextentionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,63 +29,30 @@ import (
 // TODO: API definition is missing kubebuilder annotations for validation, add them.
 // TODO: Add proper comments for each of the API fields and Structs, so we can create proper docs.
 
-type APIKeyAuthSecurityParameters struct {
-	Name     string `json:"name,omitempty"`
-	Required *bool  `json:"required,omitempty"`
+type Destination struct {
+	Schema                           string `json:"schema,omitempty"`
+	apiextentionsv1.ServiceReference `json:"serviceReference"`
 }
 
-type OpenIDConnectAuthSecurityParameters struct {
-	Name     string   `json:"name,omitempty"`
-	Required *bool    `json:"required,omitempty"`
-	Scopes   []string `json:"scopes,omitempty"`
+type HTTPPathMatch struct {
+	Type string `json:"type,omitempty"`
 }
 
-type SecurityRequirement struct {
-	APIKeyAuth        map[string]APIKeyAuthSecurityParameters        `json:"apiKeyAuth,omitempty"`
-	OpenIDConnectAuth map[string]OpenIDConnectAuthSecurityParameters `json:"openIDConnectAuth,omitempty"`
-}
+type APIMappings struct {
+	// Inline OAS
+	// +optional
+	OAS *string `json:"OAS,omitempty"`
 
-type SecurityRequirements []SecurityRequirement
+	// How to select a HTTP route by matching the HTTP request path.
+	// +optional
+	//HTTPPathMatch gatewayapiv1alpha1.HTTPPathMatch `json:"HTTPPathMatch,omitempty"`
+	HTTPPathMatch *HTTPPathMatch `json:"HTTPPathMatch,omitempty"`
+}
 
 // APISpec defines the desired state of API
 type APISpec struct {
-	TAGs []Tag `json:"tags"`
-}
-
-func (a *APISpec) Tag(tag string) (Tag, bool) {
-	for i := range a.TAGs {
-		if a.TAGs[i].Name == tag {
-			return a.TAGs[i], true
-		}
-	}
-
-	return Tag{}, false
-}
-
-type APIDefinition struct {
-	OAS string `json:"oas"`
-}
-
-type Tag struct {
-	Name          string        `json:"name"`
-	Destination   Destination   `json:"destination"`
-	APIDefinition APIDefinition `json:"api_definition"`
-}
-
-type SecurityScheme struct {
-	Name              string             `json:"name"`
-	APIKeyAuth        *APIKeyAuth        `json:"apiKeyAuth,omitempty"`
-	OpenIDConnectAuth *OpenIDConnectAuth `json:"openIDConnectAuth,omitempty"`
-}
-
-type APIKeyAuth struct {
-	Location         string                `json:"location"`
-	Name             string                `json:"name"`
-	CredentialSource APIKeyAuthCredentials `json:"credential_source"`
-}
-
-type OpenIDConnectAuth struct {
-	URL string `json:"url"`
+	Destination Destination `json:"destination"`
+	Mappings    APIMappings `json:"mappings"`
 }
 
 // APIStatus defines the observed state of API

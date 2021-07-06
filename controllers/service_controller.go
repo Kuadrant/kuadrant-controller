@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
+	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 )
 
@@ -85,7 +85,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	err = r.ReconcileResource(ctx, &v1beta1.API{}, desiredAPI, alwaysUpdateAPI)
+	err = r.ReconcileResource(ctx, &networkingv1beta1.API{}, desiredAPI, alwaysUpdateAPI)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -93,7 +93,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{}, nil
 }
 
-func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service *corev1.Service) (*v1beta1.API, error) {
+func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service *corev1.Service) (*networkingv1beta1.API, error) {
 	//Supported Annotations for now:
 	//discovery.kuadrant.io/scheme: "https"
 	//discovery.kuadrant.io/api-name: "dogs-api"
@@ -115,33 +115,32 @@ func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service *cor
 	if apiName, ok = service.Annotations["discovery.kuadrant.io/api-name"]; !ok {
 		apiName = service.GetName()
 	}
-	if tagLabel, ok = service.Annotations["discovery.kuadrant.io/tag"]; !ok {
-		return nil, fmt.Errorf("discovery.kuadrant.io/tagLabel annotation is missing or invalid")
+
+	if tagLabel, ok = service.Annotations["discovery.kuadrant.io/tag"]; ok {
+		apiName = fmt.Sprintf("%s.%s", apiName, tagLabel)
 	}
 
-	Tag := v1beta1.Tag{
-		Name: tagLabel,
-		Destination: v1beta1.Destination{
+	destination :=
+		networkingv1beta1.Destination{
 			Schema: scheme,
-			ServiceReference: &v1.ServiceReference{
+			ServiceReference: v1.ServiceReference{
 				Namespace: service.Namespace,
 				Name:      service.Name,
 				Path:      nil,
 			},
-		},
-	}
+		}
 
 	// Let's find out the port, this annotation is a little bit more tricky.
 	if port, ok = service.Annotations["discovery.kuadrant.io/port"]; ok {
 		// check if the port is a number already.
 		if num, err := strconv.ParseInt(port, 10, 32); err == nil {
 			int32num := int32(num)
-			Tag.Destination.Port = &int32num
+			destination.Port = &int32num
 		} else {
 			// As the port is name, resolv the port from the service
 			for _, p := range service.Spec.Ports {
 				if p.Name == port {
-					Tag.Destination.Port = &p.Port
+					destination.Port = &p.Port
 					break
 				}
 			}
@@ -150,11 +149,11 @@ func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service *cor
 		// As the annotation has not been set, let's check if the service has only on port, if that's the case,
 		//default to it.
 		if len(service.Spec.Ports) == 1 {
-			Tag.Destination.Port = &service.Spec.Ports[0].Port
+			destination.Port = &service.Spec.Ports[0].Port
 		}
 	}
 	// If we reach this point and the Port is still nil, this means bad news
-	if Tag.Destination.Port == nil {
+	if destination.Port == nil {
 		return nil, fmt.Errorf("discovery.kuadrant.io/port is missing or invalid")
 	}
 
@@ -172,24 +171,24 @@ func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service *cor
 		return nil, fmt.Errorf("oas configmap is missing the openapispec.yaml entry")
 	}
 
-	Tag.APIDefinition = v1beta1.APIDefinition{
-		OAS: oasConfigmap.Data["openapi.yaml"],
-	}
+	oasContent := oasConfigmap.Data["openapi.yaml"]
+
+	mappings := networkingv1beta1.APIMappings{OAS: &oasContent}
 
 	// TODO(jmprusi): We will create the API object in the same namespace as the service to simplify the deletion,
 	// review this later.
-	desiredAPI := v1beta1.API{
+	desiredAPI := &networkingv1beta1.API{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      apiName,
 			Namespace: service.Namespace,
 		},
-		Spec: v1beta1.APISpec{
-			TAGs: nil,
+		Spec: networkingv1beta1.APISpec{
+			Destination: destination,
+			Mappings:    mappings,
 		},
 	}
 
-	desiredAPI.Spec.TAGs = append(desiredAPI.Spec.TAGs, Tag)
-	return &desiredAPI, nil
+	return desiredAPI, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -233,13 +232,13 @@ func onlyLabeledServices() predicate.Predicate {
 }
 
 func alwaysUpdateAPI(existingObj, desiredObj client.Object) (bool, error) {
-	existing, ok := existingObj.(*v1beta1.API)
+	existing, ok := existingObj.(*networkingv1beta1.API)
 	if !ok {
-		return false, fmt.Errorf("%T is not a *v1beta1.API", existingObj)
+		return false, fmt.Errorf("%T is not a *networkingv1beta1.API", existingObj)
 	}
-	desired, ok := desiredObj.(*v1beta1.API)
+	desired, ok := desiredObj.(*networkingv1beta1.API)
 	if !ok {
-		return false, fmt.Errorf("%T is not a *v1beta1.API", desiredObj)
+		return false, fmt.Errorf("%T is not a *networkingv1beta1.API", desiredObj)
 	}
 
 	existing.Spec = desired.Spec

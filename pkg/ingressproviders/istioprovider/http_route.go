@@ -70,7 +70,7 @@ func (h *HTTPRouteFactory) HTTPRoute() *v1alpha3.HTTPRoute {
 	return httpRoute
 }
 
-func HTTPRoutesFromOAS(doc *openapi3.T, pathPrefix string, tag networkingv1beta1.Tag) ([]*v1alpha3.HTTPRoute, error) {
+func HTTPRoutesFromOAS(doc *openapi3.T, pathPrefix string, destination networkingv1beta1.Destination) ([]*v1alpha3.HTTPRoute, error) {
 	// TODO(jmprusi): Getting one of the hosts from the OpenAPISpec... extract this logic and improve.
 	oasURL, err := url.Parse(doc.Servers[0].URL)
 	if err != nil {
@@ -88,8 +88,8 @@ func HTTPRoutesFromOAS(doc *openapi3.T, pathPrefix string, tag networkingv1beta1
 				MatchPath:   path,
 				OpVerb:      opVerb,
 				// TODO(jmprusi): Get the actual internal cluster hostname instead of hardcoding it.
-				DestinationHost: tag.Destination.Name + "." + tag.Destination.Namespace + ".svc.cluster.local",
-				DestinationPort: uint32(*tag.Destination.Port),
+				DestinationHost: destination.Name + "." + destination.Namespace + ".svc.cluster.local",
+				DestinationPort: uint32(*destination.Port),
 			}
 
 			// Handle Prefix Override.
