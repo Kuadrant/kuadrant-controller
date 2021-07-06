@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	//gatewayapiv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayapiv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
 
 	apiextentionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,19 +34,14 @@ type Destination struct {
 	apiextentionsv1.ServiceReference `json:"serviceReference"`
 }
 
-type HTTPPathMatch struct {
-	Type string `json:"type,omitempty"`
-}
-
 type APIMappings struct {
 	// Inline OAS
 	// +optional
 	OAS *string `json:"OAS,omitempty"`
 
-	// How to select a HTTP route by matching the HTTP request path.
+	// Select a HTTP route by matching the HTTP request path.
 	// +optional
-	//HTTPPathMatch gatewayapiv1alpha1.HTTPPathMatch `json:"HTTPPathMatch,omitempty"`
-	HTTPPathMatch *HTTPPathMatch `json:"HTTPPathMatch,omitempty"`
+	HTTPPathMatch *gatewayapiv1alpha1.HTTPPathMatch `json:"HTTPPathMatch,omitempty"`
 }
 
 // APISpec defines the desired state of API

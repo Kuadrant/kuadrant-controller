@@ -70,10 +70,27 @@ spec:
               mappings:
                 properties:
                   HTTPPathMatch:
-                    description: How to select a HTTP route by matching the HTTP request
-                      path. HTTPPathMatch gatewayapiv1alpha1.HTTPPathMatch `json:"HTTPPathMatch,omitempty"`
+                    description: Select a HTTP route by matching the HTTP request
+                      path.
                     properties:
                       type:
+                        default: Prefix
+                        description: "Type specifies how to match against the path
+                          Value. \n Support: Core (Exact, Prefix) \n Support: Custom
+                          (RegularExpression, ImplementationSpecific) \n Since RegularExpression
+                          PathType has custom conformance, implementations can support
+                          POSIX, PCRE or any other dialects of regular expressions.
+                          Please read the implementation's documentation to determine
+                          the supported dialect."
+                        enum:
+                        - Exact
+                        - Prefix
+                        - RegularExpression
+                        - ImplementationSpecific
+                        type: string
+                      value:
+                        default: /
+                        description: Value of the HTTP path to match against.
                         type: string
                     type: object
                   OAS:
