@@ -40,6 +40,9 @@ kubectl apply -n "${KUADRANT_NAMESPACE}" -f utils/local-deployment/istio-manifes
 echo "Deploying Authorino to the kuadrant-system namespace"
 kubectl apply -n "${KUADRANT_NAMESPACE}" -f utils/local-deployment/authorino.yaml
 
+echo "Deploying Limitador to the kuadrant-system namespace"
+kubectl apply -n "${KUADRANT_NAMESPACE}" -f utils/local-deployment/limitador.yaml
+
 if [ -z "${RUN_OPERATOR_LOCALLY+x}" ]; then
     echo "Deploying Kuadrant control plane"
     kustomize build config/default | kubectl -n "${KUADRANT_NAMESPACE}" apply -f -
