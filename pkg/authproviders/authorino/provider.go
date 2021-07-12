@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
-	"github.com/kuadrant/kuadrant-controller/pkg/ingressproviders/istioprovider"
+	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 )
 
@@ -63,7 +63,7 @@ func APIProductToServiceConfigs(apip *networkingv1beta1.APIProduct) (*authorino.
 	serviceConfig := &authorino.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      apip.Name + apip.Namespace,
-			Namespace: istioprovider.KuadrantNamespace,
+			Namespace: common.KuadrantNamespace,
 		},
 		Spec: authorino.ServiceSpec{
 			Hosts:         apip.Spec.Routing.Hosts,

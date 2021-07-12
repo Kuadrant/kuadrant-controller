@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -87,6 +89,11 @@ func (a *APISelector) APINamespacedName() types.NamespacedName {
 	return types.NamespacedName{Namespace: a.Namespace, Name: name}
 }
 
+type InfraRateLimitSpec struct {
+	MaxValue int32 `json:"max_value"`
+	Period   int32 `json:"period_in_seconds"`
+}
+
 // APIProductSpec defines the desired state of APIProduct
 type APIProductSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -95,6 +102,10 @@ type APIProductSpec struct {
 	Routing        Routing            `json:"routing"`
 	SecurityScheme []*SecurityScheme  `json:"securityScheme"`
 	APIs           []*APISelector     `json:"APIs"`
+
+	// Select a HTTP route by matching the HTTP request path.
+	// +optional
+	RateLimit *InfraRateLimitSpec `json:"rateLimit,omitempty"`
 }
 
 // APIProductStatus defines the observed state of APIProduct
@@ -169,6 +180,11 @@ func (a *APIProduct) Validate() error {
 	}
 
 	return nil
+}
+
+func (a *APIProduct) RateLimitDomainName() string {
+	// APIProduct name/namespace should be unique in the cluster
+	return fmt.Sprintf("%s.%s", a.Name, a.Namespace)
 }
 
 //+kubebuilder:object:root=true
