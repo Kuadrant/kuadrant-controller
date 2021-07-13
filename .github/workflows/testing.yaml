@@ -60,6 +60,9 @@ jobs:
       - name: Check cluster info
         run: |
           kubectl cluster-info dump
+      - name: Port forwarding to limitador
+        run: |
+          kubectl port-forward --namespace kuadrant-system service/limitador 8888:8080 &
       - name: run tests
         run: |
           make test-integration

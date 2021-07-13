@@ -69,6 +69,19 @@ spec:
                 - description
                 - owner
                 type: object
+              rateLimit:
+                description: Select a HTTP route by matching the HTTP request path.
+                properties:
+                  max_value:
+                    format: int32
+                    type: integer
+                  period_in_seconds:
+                    format: int32
+                    type: integer
+                required:
+                - max_value
+                - period_in_seconds
+                type: object
               routing:
                 properties:
                   expose:

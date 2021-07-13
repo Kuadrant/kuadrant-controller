@@ -87,6 +87,11 @@ func (a *APISelector) APINamespacedName() types.NamespacedName {
 	return types.NamespacedName{Namespace: a.Namespace, Name: name}
 }
 
+type InfraRateLimitSpec struct {
+	MaxValue int32 `json:"max_value"`
+	Period   int32 `json:"period_in_seconds"`
+}
+
 // APIProductSpec defines the desired state of APIProduct
 type APIProductSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -95,6 +100,10 @@ type APIProductSpec struct {
 	Routing        Routing            `json:"routing"`
 	SecurityScheme []*SecurityScheme  `json:"securityScheme"`
 	APIs           []*APISelector     `json:"APIs"`
+
+	// Select a HTTP route by matching the HTTP request path.
+	// +optional
+	RateLimit *InfraRateLimitSpec `json:"rateLimit,omitempty"`
 }
 
 // APIProductStatus defines the observed state of APIProduct

@@ -19,6 +19,7 @@ package istioprovider
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -35,6 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
+	"github.com/kuadrant/kuadrant-controller/pkg/common"
+	"github.com/kuadrant/kuadrant-controller/pkg/limitador"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 )
 
@@ -44,9 +47,17 @@ const (
 	KuadrantAuthorizationProvider = "kuadrant-authorization"
 )
 
+var (
+	// Warning: limitador.kuadrant-system.svc.cluster.local only resolves within the cluster network
+	LimitadorServiceClusterHost      = fmt.Sprintf("limitador.%s.svc.cluster.local", KuadrantNamespace)
+	LimitadorServiceGrpcPort         = 8081
+	LimitadorServiceClusterAPIURLStr = fmt.Sprintf("http://%s:8080", LimitadorServiceClusterHost)
+)
+
 type IstioProvider struct {
 	*reconcilers.BaseReconciler
-	logger logr.Logger
+	logger          logr.Logger
+	limitadorClient limitador.Client
 }
 
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies,verbs=get;list;watch;create;update;patch;delete
@@ -58,12 +69,19 @@ func New(baseReconciler *reconcilers.BaseReconciler) *IstioProvider {
 	utilruntime.Must(istio.AddToScheme(baseReconciler.Scheme()))
 	utilruntime.Must(istioSecurity.AddToScheme(baseReconciler.Scheme()))
 
+	// TODO(eastizle): some discovery mechanism?
+	limitadorURL, err := url.Parse(common.GetEnvVar("LIMITADOR_URL", LimitadorServiceClusterAPIURLStr))
+	if err != nil {
+		panic(err)
+	}
+
 	// TODO: Create the gateway for Kuadrant
 	// TODO: Add the proper config to the mesh for the extAuthz.
 
 	return &IstioProvider{
-		BaseReconciler: baseReconciler,
-		logger:         ctrl.Log.WithName("kuadrant").WithName("ingressprovider").WithName("istio"),
+		BaseReconciler:  baseReconciler,
+		logger:          ctrl.Log.WithName("kuadrant").WithName("ingressprovider").WithName("istio"),
+		limitadorClient: limitador.NewClient(*limitadorURL),
 	}
 }
 
@@ -100,6 +118,11 @@ func (is *IstioProvider) Reconcile(ctx context.Context, apip *networkingv1beta1.
 	}
 
 	err = is.ReconcileIstioAuthorizationPolicy(ctx, authPolicy, alwaysUpdateAuthPolicy)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	err = is.reconcileRateLimit(ctx, apip)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

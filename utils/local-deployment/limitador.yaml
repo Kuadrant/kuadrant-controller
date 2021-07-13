@@ -53,8 +53,6 @@ spec:
         env:
           - name: RUST_LOG
             value: "info"
-          - name: LIMITS_FILE
-            value: "/home/limitador/my_limits.yaml"
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3

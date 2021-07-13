@@ -52,6 +52,7 @@ test: test-unit test-integration
 
 # Run e2e tests
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
+test-integration: export LIMITADOR_URL = http://127.0.0.1:8888
 test-integration: clean-cov generate fmt vet manifests
 	mkdir -p ${ENVTEST_ASSETS_DIR}
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
@@ -70,6 +71,7 @@ manager: generate fmt vet
 	go build -o bin/manager main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
+run: export LIMITADOR_URL ?= http://127.0.0.1:8888
 run: generate fmt vet manifests
 	go run ./main.go --zap-devel
 
