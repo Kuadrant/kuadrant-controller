@@ -1,76 +1,8 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: kuadrant-system
 ---
-apiVersion: v1
-kind: Service
+apiVersion: limitador.3scale.net/v1alpha1
+kind: Limitador
 metadata:
-  labels:
-    app: limitador
   name: limitador
-  namespace: kuadrant-system
-spec:
-  ports:
-  - name: http
-    port: 8080
-    protocol: TCP
-    targetPort: http
-  - name: grpc
-    port: 8081
-    protocol: TCP
-    targetPort: grpc
-  selector:
-    app: limitador
-  clusterIP: None
-  type: ClusterIP
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: limitador
-  name: limitador
-  namespace: kuadrant-system
 spec:
   replicas: 1
-  selector:
-    matchLabels:
-      app: limitador
-  template:
-    metadata:
-      labels:
-        app: limitador
-    spec:
-      containers:
-      - name: limitador
-        image: quay.io/3scale/limitador:0.4.0
-        ports:
-        - containerPort: 8080
-          name: http
-        - containerPort: 8081
-          name: grpc
-        env:
-          - name: RUST_LOG
-            value: "info"
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /status
-            port: 8080
-            scheme: HTTP
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 2
-        readinessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /status
-            port: 8080
-            scheme: HTTP
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 5
+  version: "0.4.0"

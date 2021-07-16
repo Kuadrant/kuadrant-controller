@@ -19,7 +19,6 @@ package istioprovider
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -37,27 +36,17 @@ import (
 
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
-	"github.com/kuadrant/kuadrant-controller/pkg/limitador"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 )
 
-//TODO: move the const to a proper place, or get it from config
-const (
-	KuadrantNamespace             = "kuadrant-system"
-	KuadrantAuthorizationProvider = "kuadrant-authorization"
-)
-
 var (
-	// Warning: limitador.kuadrant-system.svc.cluster.local only resolves within the cluster network
-	LimitadorServiceClusterHost      = fmt.Sprintf("limitador.%s.svc.cluster.local", KuadrantNamespace)
-	LimitadorServiceGrpcPort         = 8081
-	LimitadorServiceClusterAPIURLStr = fmt.Sprintf("http://%s:8080", LimitadorServiceClusterHost)
+	LimitadorServiceClusterHost = fmt.Sprintf("limitador.%s.svc.cluster.local", common.KuadrantNamespace)
+	LimitadorServiceGrpcPort    = 8081
 )
 
 type IstioProvider struct {
 	*reconcilers.BaseReconciler
-	logger          logr.Logger
-	limitadorClient limitador.Client
+	logger logr.Logger
 }
 
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies,verbs=get;list;watch;create;update;patch;delete
@@ -69,19 +58,12 @@ func New(baseReconciler *reconcilers.BaseReconciler) *IstioProvider {
 	utilruntime.Must(istio.AddToScheme(baseReconciler.Scheme()))
 	utilruntime.Must(istioSecurity.AddToScheme(baseReconciler.Scheme()))
 
-	// TODO(eastizle): some discovery mechanism?
-	limitadorURL, err := url.Parse(common.GetEnvVar("LIMITADOR_URL", LimitadorServiceClusterAPIURLStr))
-	if err != nil {
-		panic(err)
-	}
-
 	// TODO: Create the gateway for Kuadrant
 	// TODO: Add the proper config to the mesh for the extAuthz.
 
 	return &IstioProvider{
-		BaseReconciler:  baseReconciler,
-		logger:          ctrl.Log.WithName("kuadrant").WithName("ingressprovider").WithName("istio"),
-		limitadorClient: limitador.NewClient(*limitadorURL),
+		BaseReconciler: baseReconciler,
+		logger:         ctrl.Log.WithName("kuadrant").WithName("ingressprovider").WithName("istio"),
 	}
 }
 
@@ -156,7 +138,7 @@ func (is *IstioProvider) getAuthorizationPolicy(virtualService *istio.VirtualSer
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      virtualService.GetName(),
-			Namespace: KuadrantNamespace,
+			Namespace: common.KuadrantNamespace,
 		},
 		Spec: v1beta12.AuthorizationPolicy{
 			Selector: &v1beta13.WorkloadSelector{
@@ -176,7 +158,7 @@ func (is *IstioProvider) getAuthorizationPolicy(virtualService *istio.VirtualSer
 			Action: v1beta12.AuthorizationPolicy_CUSTOM,
 			ActionDetail: &v1beta12.AuthorizationPolicy_Provider{
 				Provider: &v1beta12.AuthorizationPolicy_ExtensionProvider{
-					Name: KuadrantAuthorizationProvider,
+					Name: common.KuadrantAuthorizationProvider,
 				},
 			},
 		},
@@ -200,7 +182,7 @@ func (is *IstioProvider) virtualServiceFromAPIProduct(ctx context.Context, apip 
 
 	factory := VirtualServiceFactory{
 		ObjectName: apip.Name + apip.Namespace,
-		Namespace:  KuadrantNamespace,
+		Namespace:  common.KuadrantNamespace,
 		Hosts:      apip.Spec.Routing.Hosts,
 		HTTPRoutes: httpRoutes,
 	}
@@ -235,7 +217,7 @@ func (is *IstioProvider) Delete(ctx context.Context, apip *networkingv1beta1.API
 	virtualService := &istio.VirtualService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      apip.Name + apip.Namespace,
-			Namespace: KuadrantNamespace,
+			Namespace: common.KuadrantNamespace,
 		},
 	}
 	is.DeleteResource(ctx, virtualService)

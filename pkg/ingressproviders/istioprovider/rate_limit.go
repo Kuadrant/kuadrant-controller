@@ -29,26 +29,10 @@ import (
 
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
-	"github.com/kuadrant/kuadrant-controller/pkg/limitador"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 )
 
-// TODO(eastizle): Use the limitador operator to manage rate limits in limitador service
 func (is *IstioProvider) reconcileRateLimit(ctx context.Context, apip *networkingv1beta1.APIProduct) error {
-	err := is.reconcileRateLimitConf(apip)
-	if err != nil {
-		return err
-	}
-
-	err = is.reconcileRateLimitIstioDeploy(ctx, apip)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (is *IstioProvider) reconcileRateLimitIstioDeploy(ctx context.Context, apip *networkingv1beta1.APIProduct) error {
 	desiredEnvoyFilter := rateLimitEnvoyFilter(apip)
 
 	if apip.Spec.RateLimit == nil {
@@ -71,7 +55,7 @@ func rateLimitEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("kuadrant-%s.%s-ratelimit", apip.Name, apip.Namespace),
-			Namespace: KuadrantNamespace,
+			Namespace: common.KuadrantNamespace,
 		},
 		Spec: istioapiv1alpha3.EnvoyFilter{
 			WorkloadSelector: &istioapiv1alpha3.WorkloadSelector{
@@ -89,11 +73,6 @@ func rateLimitEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1
 	}
 
 	return envoyFilter
-}
-
-// TODO(eastizle): EnvoyFilter does not exist in "istio.io/client-go/pkg/apis/networking/v1alpha3". Alternative in v1beta1???
-func (is *IstioProvider) ReconcileIstioEnvoyFilter(ctx context.Context, desired *istionetworkingv1alpha3.EnvoyFilter, mutatefn reconcilers.MutateFn) error {
-	return is.ReconcileResource(ctx, &istionetworkingv1alpha3.EnvoyFilter{}, desired, mutatefn)
 }
 
 func rateLimitActionsEnvoyPatch(host string) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
@@ -152,7 +131,7 @@ func httpFilterEnvoyPatch(apip *networkingv1beta1.APIProduct) *istioapiv1alpha3.
 			"name": "envoy.filters.http.ratelimit",
 			"typed_config": map[string]interface{}{
 				"@type":             "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit",
-				"domain":            rateLimitDomain(apip),
+				"domain":            apip.RateLimitDomainName(),
 				"failure_mode_deny": true,
 				"rate_limit_service": map[string]interface{}{
 					"transport_api_version": "V3",
@@ -251,66 +230,9 @@ func clusterEnvoyPatch() *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
 	}
 }
 
-func rateLimitDomain(apip *networkingv1beta1.APIProduct) string {
-	if apip == nil {
-		return ""
-	}
-	return fmt.Sprintf("%s.%s", apip.Name, apip.Namespace)
-}
-
-func (is *IstioProvider) reconcileRateLimitConf(apip *networkingv1beta1.APIProduct) error {
-	log := is.Logger().WithName("ratelimit").WithValues("apiproduct", client.ObjectKeyFromObject(apip))
-
-	currentLimits, err := is.limitadorClient.GetLimits(rateLimitDomain(apip))
-	log.V(1).Info("get limits", "error", err)
-	if err != nil {
-		return err
-	}
-
-	if apip.Spec.RateLimit == nil {
-		for idx := range currentLimits {
-			err := is.limitadorClient.DeleteLimit(currentLimits[idx])
-			log.V(1).Info("delete limit", "limit", currentLimits[idx], "error", err)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	desiredRateLimit := limitador.RateLimit{
-		// APIProduct name/namespace should be unique in the cluster
-		Namespace: rateLimitDomain(apip),
-		// Descriptor configured in EnvoyFilter in the rateLimitActionsEnvoyPatch method
-		Conditions: []string{"generic_key == kuadrant"},
-		Variables:  []string{},
-		MaxValue:   int(apip.Spec.RateLimit.MaxValue),
-		Seconds:    int(apip.Spec.RateLimit.Period),
-	}
-
-	found := false
-	for idx := range currentLimits {
-		if reflect.DeepEqual(currentLimits[idx], desiredRateLimit) {
-			found = true
-		} else {
-			err := is.limitadorClient.DeleteLimit(currentLimits[idx])
-			log.V(1).Info("delete limit", "limit", currentLimits[idx], "error", err)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	if !found {
-		err := is.limitadorClient.CreateLimit(desiredRateLimit)
-		log.V(1).Info("create limit", "limit", desiredRateLimit, "error", err)
-		if err != nil {
-			return err
-		}
-	}
-
-	return err
+// TODO(eastizle): EnvoyFilter does not exist in "istio.io/client-go/pkg/apis/networking/v1alpha3". Alternative in v1beta1???
+func (is *IstioProvider) ReconcileIstioEnvoyFilter(ctx context.Context, desired *istionetworkingv1alpha3.EnvoyFilter, mutatefn reconcilers.MutateFn) error {
+	return is.ReconcileResource(ctx, &istionetworkingv1alpha3.EnvoyFilter{}, desired, mutatefn)
 }
 
 func envoyFilterBasicMutator(existingObj, desiredObj client.Object) (bool, error) {

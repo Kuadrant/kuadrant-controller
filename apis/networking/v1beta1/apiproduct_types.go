@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -178,6 +180,11 @@ func (a *APIProduct) Validate() error {
 	}
 
 	return nil
+}
+
+func (a *APIProduct) RateLimitDomainName() string {
+	// APIProduct name/namespace should be unique in the cluster
+	return fmt.Sprintf("%s.%s", a.Name, a.Namespace)
 }
 
 //+kubebuilder:object:root=true

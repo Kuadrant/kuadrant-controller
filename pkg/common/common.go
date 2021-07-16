@@ -16,13 +16,8 @@ limitations under the License.
 
 package common
 
-import (
-	"os"
+//TODO: move the const to a proper place, or get it from config
+const (
+	KuadrantNamespace             = "kuadrant-system"
+	KuadrantAuthorizationProvider = "kuadrant-authorization"
 )
-
-func GetEnvVar(key, def string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return def
-}
