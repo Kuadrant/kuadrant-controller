@@ -20,7 +20,7 @@ Kuadrant can leverage annotations. A good place to annotate is the Service used 
 - **discovery.kuadrant.io/matchpath**: *OPTIONAL* Define a single specific path, prefix or regex. Defaults to `/`.
 - **discovery.kuadrant.io/matchpath-type**: *OPTIONAL* Specifies how to match against the `matchpath` value. Accepted values are `Exact`, `Prefix` and `RegularExpression`. Defaults to `Prefix`.
 - **discovery.kuadrant.io/oas-path**: *OPTIONAL* Define a specific path for retrieving the config from the service itself.
-- **discovery.kuadrant.io/oas-name-port**: The port to be used to retrieve the OAS config, if not defined, it will used the first one
+- **discovery.kuadrant.io/oas-name-port**: *OPTIONAL* The port to be used to retrieve the OAS config, if not defined, it will used the first one
 
 ### Labels:
 - **discovery.kuadrant.io/enabled:**: *REQUIRED* true or false, marks the object to be discovered by kuadrant.
@@ -94,7 +94,7 @@ spec:
 
 Example of a kuadrant annotated service providing OpenAPI spec in the service.
 
-```
+```yaml
 ---
 apiVersion: apps/v1
 kind: Deployment
