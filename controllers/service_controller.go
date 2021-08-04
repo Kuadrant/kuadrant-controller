@@ -115,7 +115,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{}, nil
 }
 
-func (r *ServiceReconciler) IsOasDefined(ctx context.Context, service *corev1.Service, log logr.Logger) (bool, string, error) {
+func (r *ServiceReconciler) isOASDefined(ctx context.Context, service *corev1.Service, log logr.Logger) (bool, string, error) {
 	var oasContent string
 	if oasConfigmapName, ok := service.Annotations[KuadrantDiscoveryAnnotationOASConfigMap]; ok {
 		oasContent, err := r.fetchOpenAPIFromConfigMap(
@@ -147,15 +147,18 @@ func (r *ServiceReconciler) IsOasDefined(ctx context.Context, service *corev1.Se
 
 		// This is terrible hack, we should use the same way as Coredns use it, but
 		// for the moment is ok like this
+		// About coredns, you can see some examples here, externalName, etc..
+		// https://github.com/coredns/coredns/blob/4758070425ac2f4f43c71c82ba3aca847965e394/plugin/kubernetes/kubernetes.go#L527
 		var targetURL = fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", service.Name, service.Namespace, targetPort)
 		resp, err := http.Get(fmt.Sprintf("%s%s", targetURL, oasURLdefined))
 		if err != nil {
 			return true, "", err
 		}
 		if resp.StatusCode != 200 {
-			return true, "", fmt.Errorf("cannot retrieve OAS from %s", targetURL)
+			return true, "", fmt.Errorf("cannot retrieve OAS from '%s' statusCode='%d'", targetURL, resp.StatusCode)
 		}
 		body, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
 		if err != nil {
 			return true, "", fmt.Errorf("cannot read the body of %s: %w", targetURL, err)
 		}
@@ -196,7 +199,7 @@ func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service *cor
 	var oasContentPtr *string
 	var pathMatchPtr *gatewayapiv1alpha1.HTTPPathMatch
 
-	hasOas, OASContent, err := r.IsOasDefined(ctx, service, log)
+	hasOas, OASContent, err := r.isOASDefined(ctx, service, log)
 	if err != nil {
 		return nil, err
 	}

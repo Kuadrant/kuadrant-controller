@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -119,8 +120,8 @@ func getSampleService() *v1.Service {
 func TestOasDiscoveryNoAnnotation(t *testing.T) {
 	serviceReconciler := getServiceReconciler()
 	svc := getSampleService()
-	log := serviceReconciler.Logger().WithValues("test", "foo")
-	hasOas, result, err := serviceReconciler.IsOasDefined(context.Background(), svc, log)
+	log := ctrl.Log.WithName("test")
+	hasOas, result, err := serviceReconciler.isOASDefined(context.Background(), svc, log)
 	if hasOas {
 		t.Errorf("Returning OAS when it shouldn't res='%+v', err='%s'", result, err)
 	}
@@ -130,7 +131,7 @@ func TestOasDiscoveryNoAnnotation(t *testing.T) {
 	}
 }
 
-// TestOasDiscoveryServiceDiscovery check IsOasDefined function, and check all
+// TestOasDiscoveryServiceDiscovery check isOASDefined function, and check all
 // OAS discovery options, due to invalid connection, getting the first port,
 // and checking the port Name.
 // A complete example of this can be found on samples/api-oas-discovery.yaml
@@ -143,8 +144,9 @@ func TestOasDiscoveryServiceDiscovery(t *testing.T) {
 	}
 
 	// first test, should return error, API is not working at all
-	log := serviceReconciler.Logger().WithValues("test", "foo")
-	hasOas, result, err := serviceReconciler.IsOasDefined(context.Background(), svc, log)
+
+	log := ctrl.Log.WithName("test")
+	hasOas, result, err := serviceReconciler.isOASDefined(context.Background(), svc, log)
 	if err == nil {
 		t.Errorf("HTTP request cannot perform, should return an error")
 	}
@@ -156,7 +158,7 @@ func TestOasDiscoveryServiceDiscovery(t *testing.T) {
 		"GET",
 		"http://test.test.svc.cluster.local:10000/openapi",
 		httpmock.NewStringResponder(200, PetStoreOAS))
-	hasOas, result, err = serviceReconciler.IsOasDefined(context.Background(), svc, log)
+	hasOas, result, err = serviceReconciler.isOASDefined(context.Background(), svc, log)
 
 	httpmock.Deactivate()
 	if err != nil {
@@ -182,7 +184,7 @@ func TestOasDiscoveryServiceDiscovery(t *testing.T) {
 		"GET",
 		"http://test.test.svc.cluster.local:8080/openapi",
 		httpmock.NewStringResponder(200, PetStoreOAS))
-	hasOas, result, err = serviceReconciler.IsOasDefined(context.Background(), svc, log)
+	hasOas, result, err = serviceReconciler.isOASDefined(context.Background(), svc, log)
 
 	if err != nil {
 		t.Errorf("returning error when it shouldn't")
@@ -208,8 +210,9 @@ func TestOasDiscoveryConfigMapDiscovery(t *testing.T) {
 		TestKuadrantDiscoveryAnnotationOASConfigMap: "cat-oas-invalid",
 	}
 	// First test, no configmap
-	log := serviceReconciler.Logger().WithValues("test", "foo")
-	hasOas, result, err := serviceReconciler.IsOasDefined(context.Background(), svc, log)
+
+	log := ctrl.Log.WithName("test")
+	hasOas, result, err := serviceReconciler.isOASDefined(context.Background(), svc, log)
 	if err != nil && err.Error() != "configmaps \"cat-oas-invalid\" not found" {
 		t.Errorf("Should return a error err='%s'", err)
 	}
@@ -226,7 +229,7 @@ func TestOasDiscoveryConfigMapDiscovery(t *testing.T) {
 	svc.ObjectMeta.Annotations = map[string]string{
 		TestKuadrantDiscoveryAnnotationOASConfigMap: "cat-oas",
 	}
-	hasOas, result, err = serviceReconciler.IsOasDefined(context.Background(), svc, log)
+	hasOas, result, err = serviceReconciler.isOASDefined(context.Background(), svc, log)
 	if err != nil {
 		t.Errorf("returning error when it shouldn't")
 	}
@@ -242,7 +245,7 @@ func TestOasDiscoveryConfigMapDiscovery(t *testing.T) {
 	svc.ObjectMeta.Annotations = map[string]string{
 		TestKuadrantDiscoveryAnnotationOASConfigMap: "dog-oas",
 	}
-	hasOas, result, err = serviceReconciler.IsOasDefined(context.Background(), svc, log)
+	hasOas, result, err = serviceReconciler.isOASDefined(context.Background(), svc, log)
 	if err != nil && err.Error() != "oas configmap is missing the openapi.yaml entry" {
 		t.Errorf("Returned error is not a valid one err='%s'", err)
 	}
