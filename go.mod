@@ -1,6 +1,6 @@
 module github.com/kuadrant/kuadrant-controller
 
-go 1.15
+go 1.16
 
 require (
 	github.com/Azure/go-autorest/autorest v0.11.19 // indirect
