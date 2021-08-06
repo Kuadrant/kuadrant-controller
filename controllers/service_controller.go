@@ -154,11 +154,12 @@ func (r *ServiceReconciler) isOASDefined(ctx context.Context, service *corev1.Se
 		if err != nil {
 			return true, "", err
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
 			return true, "", fmt.Errorf("cannot retrieve OAS from '%s' statusCode='%d'", targetURL, resp.StatusCode)
 		}
 		body, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+
 		if err != nil {
 			return true, "", fmt.Errorf("cannot read the body of %s: %w", targetURL, err)
 		}
