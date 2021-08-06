@@ -52,6 +52,8 @@ const (
 	KuadrantDiscoveryAnnotationMatchPathType = "discovery.kuadrant.io/matchpath-type"
 	KuadrantDiscoveryAnnotationOASPath       = "discovery.kuadrant.io/oas-path"
 	KuadrantDiscoveryAnnotationOASNamePort   = "discovery.kuadrant.io/oas-name-port"
+
+	maxBodyLog = 128 // How many bytes from HTTP request body should be log.
 )
 
 // ServiceReconciler reconciles a Service object
@@ -155,14 +157,23 @@ func (r *ServiceReconciler) isOASDefined(ctx context.Context, service *corev1.Se
 			return true, "", err
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return true, "", fmt.Errorf("cannot retrieve OAS from '%s' statusCode='%d'", targetURL, resp.StatusCode)
-		}
-		body, err := io.ReadAll(resp.Body)
 
+		// We read the body here, just before checking the status code, just
+		// because the team want to log the body in case of a invalid status code.
+		// Context: https://github.com/Kuadrant/kuadrant-controller/pull/44#discussion_r684146743
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return true, "", fmt.Errorf("cannot read the body of %s: %w", targetURL, err)
 		}
+
+		if resp.StatusCode != 200 {
+			var bodyLogMax = maxBodyLog
+			if cap(body) < bodyLogMax {
+				bodyLogMax = cap(body)
+			}
+			return true, "", fmt.Errorf("cannot retrieve OAS from '%s' statusCode='%d' body='%s'", targetURL, resp.StatusCode, body[0:bodyLogMax])
+		}
+
 		return true, string(body), nil
 	}
 
