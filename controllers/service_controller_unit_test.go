@@ -156,7 +156,7 @@ func TestOasDiscoveryServiceDiscovery(t *testing.T) {
 	defer httpmock.Deactivate()
 	httpmock.RegisterResponder(
 		"GET",
-		"http://test.test.svc.cluster.local:10000/openapi",
+		"http://test.test.svc:10000/openapi",
 		httpmock.NewStringResponder(200, PetStoreOAS))
 	hasOas, result, err = serviceReconciler.isOASDefined(context.Background(), svc, log)
 
@@ -182,7 +182,7 @@ func TestOasDiscoveryServiceDiscovery(t *testing.T) {
 	defer httpmock.Deactivate()
 	httpmock.RegisterResponder(
 		"GET",
-		"http://test.test.svc.cluster.local:8080/openapi",
+		"http://test.test.svc:8080/openapi",
 		httpmock.NewStringResponder(200, PetStoreOAS))
 	hasOas, result, err = serviceReconciler.isOASDefined(context.Background(), svc, log)
 
@@ -253,4 +253,18 @@ func TestOasDiscoveryConfigMapDiscovery(t *testing.T) {
 	if !hasOas {
 		t.Errorf("HasOas should be true, because the annotation")
 	}
+}
+
+func TestServiceDomainName(t *testing.T) {
+	svc := getSampleService()
+	if getServiceDomainName(svc) != "test.test.svc" {
+		t.Errorf("Get Domain name is not correct expected='test.test.svc' got='%s'", svc)
+	}
+
+	// Second test, using externalName
+	svc.Spec.ExternalName = "foo.com"
+	if getServiceDomainName(svc) != "foo.com" {
+		t.Errorf("Get Domain name is not correct expected='foo.com' got='%s'", svc)
+	}
+
 }

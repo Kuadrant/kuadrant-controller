@@ -147,11 +147,7 @@ func (r *ServiceReconciler) isOASDefined(ctx context.Context, service *corev1.Se
 			}
 		}
 
-		// This is terrible hack, we should use the same way as Coredns use it, but
-		// for the moment is ok like this
-		// About coredns, you can see some examples here, externalName, etc..
-		// https://github.com/coredns/coredns/blob/4758070425ac2f4f43c71c82ba3aca847965e394/plugin/kubernetes/kubernetes.go#L527
-		var targetURL = fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", service.Name, service.Namespace, targetPort)
+		var targetURL = fmt.Sprintf("http://%s:%d", getServiceDomainName(service), targetPort)
 		resp, err := http.Get(fmt.Sprintf("%s%s", targetURL, oasURLdefined))
 		if err != nil {
 			return true, "", err
@@ -388,4 +384,11 @@ func alwaysUpdateAPI(existingObj, desiredObj client.Object) (bool, error) {
 
 	existing.Spec = desired.Spec
 	return true, nil
+}
+
+func getServiceDomainName(service *corev1.Service) string {
+	if service.Spec.ExternalName != "" {
+		return service.Spec.ExternalName
+	}
+	return fmt.Sprintf("%s.%s.svc", service.Name, service.Namespace)
 }
