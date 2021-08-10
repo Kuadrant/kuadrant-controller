@@ -147,7 +147,7 @@ func (r *ServiceReconciler) isOASDefined(ctx context.Context, service *corev1.Se
 			}
 		}
 
-		var targetURL = fmt.Sprintf("http://%s:%d", getServiceDomainName(service), targetPort)
+		var targetURL = fmt.Sprintf("http://%s.%s.svc:%d", service.Name, service.Namespace, targetPort)
 		resp, err := http.Get(fmt.Sprintf("%s%s", targetURL, oasURLdefined))
 		if err != nil {
 			return true, "", err
@@ -164,8 +164,8 @@ func (r *ServiceReconciler) isOASDefined(ctx context.Context, service *corev1.Se
 
 		if resp.StatusCode != 200 {
 			var bodyLogMax = maxBodyLog
-			if cap(body) < bodyLogMax {
-				bodyLogMax = cap(body)
+			if len(body) < bodyLogMax {
+				bodyLogMax = len(body)
 			}
 			return true, "", fmt.Errorf("cannot retrieve OAS from '%s' statusCode='%d' body='%s'", targetURL, resp.StatusCode, body[0:bodyLogMax])
 		}
@@ -384,11 +384,4 @@ func alwaysUpdateAPI(existingObj, desiredObj client.Object) (bool, error) {
 
 	existing.Spec = desired.Spec
 	return true, nil
-}
-
-func getServiceDomainName(service *corev1.Service) string {
-	if service.Spec.ExternalName != "" {
-		return service.Spec.ExternalName
-	}
-	return fmt.Sprintf("%s.%s.svc", service.Name, service.Namespace)
 }

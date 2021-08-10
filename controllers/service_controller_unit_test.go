@@ -254,17 +254,3 @@ func TestOasDiscoveryConfigMapDiscovery(t *testing.T) {
 		t.Errorf("HasOas should be true, because the annotation")
 	}
 }
-
-func TestServiceDomainName(t *testing.T) {
-	svc := getSampleService()
-	if getServiceDomainName(svc) != "test.test.svc" {
-		t.Errorf("Get Domain name is not correct expected='test.test.svc' got='%s'", svc)
-	}
-
-	// Second test, using externalName
-	svc.Spec.ExternalName = "foo.com"
-	if getServiceDomainName(svc) != "foo.com" {
-		t.Errorf("Get Domain name is not correct expected='foo.com' got='%s'", svc)
-	}
-
-}
