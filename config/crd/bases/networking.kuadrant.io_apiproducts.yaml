@@ -70,20 +70,42 @@ spec:
                 - owner
                 type: object
               rateLimit:
-                description: Select a HTTP route by matching the HTTP request path.
+                description: RateLimit configures global rate limit parameters
                 properties:
-                  maxValue:
-                    description: MaxValue represents the number of requests allowed
-                      per defined period of time.
-                    format: int32
-                    type: integer
-                  period:
-                    description: Period represents the period of time in seconds.
-                    format: int32
-                    type: integer
-                required:
-                - maxValue
-                - period
+                  authenticated:
+                    description: AuthRateLimit configures global rate limit parameters
+                      per user_id
+                    properties:
+                      maxValue:
+                        description: MaxValue represents the number of requests allowed
+                          per defined period of time.
+                        format: int32
+                        type: integer
+                      period:
+                        description: Period represents the period of time in seconds.
+                        format: int32
+                        type: integer
+                    required:
+                    - maxValue
+                    - period
+                    type: object
+                  preAuthenticated:
+                    description: PreAuthRateLimitSpec configures rate limit parameters
+                      per remote address
+                    properties:
+                      maxValue:
+                        description: MaxValue represents the number of requests allowed
+                          per defined period of time.
+                        format: int32
+                        type: integer
+                      period:
+                        description: Period represents the period of time in seconds.
+                        format: int32
+                        type: integer
+                    required:
+                    - maxValue
+                    - period
+                    type: object
                 type: object
               routing:
                 properties:

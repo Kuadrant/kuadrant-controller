@@ -70,6 +70,7 @@ func buildAuthConfig(apip *networkingv1beta1.APIProduct) (*authorino.AuthConfig,
 			Identity:      nil,
 			Metadata:      nil,
 			Authorization: nil,
+			Response:      nil,
 		},
 	}
 
@@ -96,6 +97,28 @@ func buildAuthConfig(apip *networkingv1beta1.APIProduct) (*authorino.AuthConfig,
 		}
 		authConfig.Spec.Identity = append(authConfig.Spec.Identity, &identity)
 	}
+
+	// Response
+	if apip.AuthRateLimit() != nil && apip.HasAPIKeyAuth() {
+		response := &authorino.Response{
+			Name:       "rate-limit-apikey",
+			Wrapper:    authorino.Response_Wrapper("envoyDynamicMetadata"),
+			WrapperKey: "ext_auth_data",
+			JSON: &authorino.Response_DynamicJSON{
+				Properties: []authorino.JsonProperty{
+					{
+						Name: "user-id",
+						ValueFrom: authorino.ValueFromAuthJSON{
+							AuthJSON: `auth.identity.metadata.annotations.secret\.kuadrant\.io/user-id`,
+						},
+					},
+				},
+			},
+		}
+
+		authConfig.Spec.Response = append(authConfig.Spec.Response, response)
+	}
+
 	return authConfig, nil
 }
 

@@ -89,11 +89,28 @@ func (a *APISelector) APINamespacedName() types.NamespacedName {
 	return types.NamespacedName{Namespace: a.Namespace, Name: name}
 }
 
-type InfraRateLimitSpec struct {
+type AuthRateLimitSpec struct {
 	// MaxValue represents the number of requests allowed per defined period of time.
 	MaxValue int32 `json:"maxValue"`
 	// Period represents the period of time in seconds.
 	Period int32 `json:"period"`
+}
+
+type PreAuthRateLimitSpec struct {
+	// MaxValue represents the number of requests allowed per defined period of time.
+	MaxValue int32 `json:"maxValue"`
+	// Period represents the period of time in seconds.
+	Period int32 `json:"period"`
+}
+
+type RateLimitSpec struct {
+	// PreAuthRateLimitSpec configures rate limit parameters per remote address
+	// +optional
+	PreAuthRateLimit *PreAuthRateLimitSpec `json:"preAuthenticated,omitempty"`
+
+	// AuthRateLimit configures global rate limit parameters per user_id
+	// +optional
+	AuthRateLimit *AuthRateLimitSpec `json:"authenticated,omitempty"`
 }
 
 // APIProductSpec defines the desired state of APIProduct
@@ -105,9 +122,9 @@ type APIProductSpec struct {
 	SecurityScheme []*SecurityScheme  `json:"securityScheme"`
 	APIs           []*APISelector     `json:"APIs"`
 
-	// Select a HTTP route by matching the HTTP request path.
+	// RateLimit configures global rate limit parameters
 	// +optional
-	RateLimit *InfraRateLimitSpec `json:"rateLimit,omitempty"`
+	RateLimit *RateLimitSpec `json:"rateLimit,omitempty"`
 }
 
 // APIProductStatus defines the observed state of APIProduct
@@ -187,6 +204,36 @@ func (a *APIProduct) Validate() error {
 func (a *APIProduct) RateLimitDomainName() string {
 	// APIProduct name/namespace should be unique in the cluster
 	return fmt.Sprintf("%s.%s", a.Name, a.Namespace)
+}
+
+func (a *APIProduct) PreAuthRateLimit() *PreAuthRateLimitSpec {
+	if a.Spec.RateLimit == nil {
+		return nil
+	}
+
+	return a.Spec.RateLimit.PreAuthRateLimit
+}
+
+func (a *APIProduct) AuthRateLimit() *AuthRateLimitSpec {
+	if a.Spec.RateLimit == nil {
+		return nil
+	}
+
+	return a.Spec.RateLimit.AuthRateLimit
+}
+
+func (a *APIProduct) IsRateLimitEnabled() bool {
+	return a.AuthRateLimit() != nil || a.PreAuthRateLimit() != nil
+}
+
+func (a *APIProduct) HasAPIKeyAuth() bool {
+	for _, securityScheme := range a.Spec.SecurityScheme {
+		if securityScheme.APIKeyAuth != nil {
+			return true
+		}
+	}
+
+	return false
 }
 
 //+kubebuilder:object:root=true

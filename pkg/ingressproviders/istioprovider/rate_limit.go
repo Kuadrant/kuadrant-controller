@@ -23,7 +23,6 @@ import (
 
 	istioapiv1alpha3 "istio.io/api/networking/v1alpha3"
 	istionetworkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,14 +31,28 @@ import (
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 )
 
-func (is *IstioProvider) reconcileRateLimit(ctx context.Context, apip *networkingv1beta1.APIProduct) error {
-	desiredEnvoyFilter := rateLimitEnvoyFilter(apip)
+type HTTPFilterStage uint32
 
-	if apip.Spec.RateLimit == nil {
-		common.TagObjectToDelete(desiredEnvoyFilter)
+const (
+	PreAuthStage HTTPFilterStage = iota
+	PostAuthStage
+)
+
+func (is *IstioProvider) reconcileRateLimit(ctx context.Context, apip *networkingv1beta1.APIProduct) error {
+	desiredEF := clusterEnvoyFilter(apip)
+	err := is.ReconcileIstioEnvoyFilter(ctx, desiredEF, envoyFilterBasicMutator)
+	if err != nil {
+		return err
 	}
 
-	err := is.ReconcileIstioEnvoyFilter(ctx, desiredEnvoyFilter, envoyFilterBasicMutator)
+	desiredEF = preAuthEnvoyFilter(apip)
+	err = is.ReconcileIstioEnvoyFilter(ctx, desiredEF, envoyFilterBasicMutator)
+	if err != nil {
+		return err
+	}
+
+	desiredEF = postAuthEnvoyFilter(apip)
+	err = is.ReconcileIstioEnvoyFilter(ctx, desiredEF, envoyFilterBasicMutator)
 	if err != nil {
 		return err
 	}
@@ -47,55 +60,92 @@ func (is *IstioProvider) reconcileRateLimit(ctx context.Context, apip *networkin
 	return nil
 }
 
-func rateLimitEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1alpha3.EnvoyFilter {
-	envoyFilter := &istionetworkingv1alpha3.EnvoyFilter{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "EnvoyFilter",
-			APIVersion: "networking.istio.io/v1alpha3",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("kuadrant-%s.%s-ratelimit", apip.Name, apip.Namespace),
-			Namespace: common.KuadrantNamespace,
-		},
-		Spec: istioapiv1alpha3.EnvoyFilter{
-			WorkloadSelector: &istioapiv1alpha3.WorkloadSelector{
-				Labels: map[string]string{"istio": "kuadrant-system"},
-			},
-			ConfigPatches: []*istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
-				httpFilterEnvoyPatch(apip),
-				clusterEnvoyPatch(),
-			},
-		},
+func clusterEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1alpha3.EnvoyFilter {
+	factory := EnvoyFilterFactory{
+		ObjectName: fmt.Sprintf("%s.%s-rate-limit-cluster", apip.Name, apip.Namespace),
+		Namespace:  common.KuadrantNamespace,
+		Patches:    make([]*istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, 0),
 	}
 
-	for _, host := range apip.Spec.Routing.Hosts {
-		envoyFilter.Spec.ConfigPatches = append(envoyFilter.Spec.ConfigPatches, rateLimitActionsEnvoyPatch(host))
+	if !apip.IsRateLimitEnabled() {
+		envoyFilter := factory.EnvoyFilter()
+		common.TagObjectToDelete(envoyFilter)
+		return envoyFilter
 	}
 
-	return envoyFilter
+	factory.Patches = append(factory.Patches, clusterEnvoyPatch())
+	return factory.EnvoyFilter()
 }
 
-func rateLimitActionsEnvoyPatch(host string) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+func preAuthEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1alpha3.EnvoyFilter {
+	factory := EnvoyFilterFactory{
+		ObjectName: fmt.Sprintf("%s.%s-rate-limit-preauth", apip.Name, apip.Namespace),
+		Namespace:  common.KuadrantNamespace,
+		Patches:    make([]*istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, 0),
+	}
+
+	if apip.PreAuthRateLimit() == nil {
+		envoyFilter := factory.EnvoyFilter()
+		common.TagObjectToDelete(envoyFilter)
+		return envoyFilter
+	}
+
+	factory.Patches = append(factory.Patches, preAuthHTTPFilterEnvoyPatch(apip))
+
+	for _, host := range apip.Spec.Routing.Hosts {
+		factory.Patches = append(factory.Patches, preAuthActionsEnvoyPatch(host))
+	}
+
+	return factory.EnvoyFilter()
+}
+
+func postAuthEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1alpha3.EnvoyFilter {
+	factory := EnvoyFilterFactory{
+		ObjectName: fmt.Sprintf("%s.%s-rate-limit-postauth", apip.Name, apip.Namespace),
+		Namespace:  common.KuadrantNamespace,
+		Patches:    make([]*istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, 0),
+	}
+
+	if apip.AuthRateLimit() == nil {
+		envoyFilter := factory.EnvoyFilter()
+		common.TagObjectToDelete(envoyFilter)
+		return envoyFilter
+	}
+
+	factory.Patches = append(factory.Patches, postAuthHTTPFilterEnvoyPatch(apip))
+
+	for _, host := range apip.Spec.Routing.Hosts {
+		factory.Patches = append(factory.Patches, postAuthActionsEnvoyPatch(host))
+	}
+
+	return factory.EnvoyFilter()
+}
+
+func preAuthActionsEnvoyPatch(host string) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
 	// defines the route configuration on which to rate limit
+	patchUnstructured := map[string]interface{}{
+		"operation": "MERGE",
+		"value": map[string]interface{}{
+			"rate_limits": []map[string]interface{}{
+				{
+					"stage": PreAuthStage,
+					"actions": []map[string]interface{}{
+						{
+							"remote_address": map[string]interface{}{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	patchRaw, err := json.Marshal(patchUnstructured)
+	if err != nil {
+		panic(err)
+	}
+
 	patch := &istioapiv1alpha3.EnvoyFilter_Patch{}
-
-	patchRaw := []byte(
-		`{
-			"operation": "MERGE",
-			"value": {
-				"rate_limits": [
-					{
-						"actions": [
-							{
-								"remote_address": {}
-							}
-						]
-					}
-				]
-			}
-		}`)
-
-	err := patch.UnmarshalJSON(patchRaw)
+	err = patch.UnmarshalJSON(patchRaw)
 	if err != nil {
 		panic(err)
 	}
@@ -119,17 +169,139 @@ func rateLimitActionsEnvoyPatch(host string) *istioapiv1alpha3.EnvoyFilter_Envoy
 	}
 }
 
-func httpFilterEnvoyPatch(apip *networkingv1beta1.APIProduct) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
-	// The patch inserts the envoy.filters.http.ratelimit global envoy filter
-	// filter into the HTTP_FILTER chain.
+func postAuthActionsEnvoyPatch(host string) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+	// defines the route configuration on which to rate limit
+	patchUnstructured := map[string]interface{}{
+		"operation": "MERGE",
+		"value": map[string]interface{}{
+			"rate_limits": []map[string]interface{}{
+				{
+					"stage": PostAuthStage,
+					"actions": []map[string]interface{}{
+						{
+							"metadata": map[string]interface{}{
+								"metadata_key": map[string]interface{}{
+									"key": "envoy.filters.http.ext_authz",
+									"path": []map[string]string{
+										{
+											"key": "ext_auth_data",
+										},
+										{
+											"key": "user-id",
+										},
+									},
+								},
+								"descriptor_key": "user_id",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	patchRaw, err := json.Marshal(patchUnstructured)
+	if err != nil {
+		panic(err)
+	}
+
+	patch := &istioapiv1alpha3.EnvoyFilter_Patch{}
+	err = patch.UnmarshalJSON(patchRaw)
+	if err != nil {
+		panic(err)
+	}
+
+	return &istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
+		ApplyTo: istioapiv1alpha3.EnvoyFilter_VIRTUAL_HOST,
+		Match: &istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
+			Context: istioapiv1alpha3.EnvoyFilter_GATEWAY,
+			ObjectTypes: &istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
+				RouteConfiguration: &istioapiv1alpha3.EnvoyFilter_RouteConfigurationMatch{
+					Vhost: &istioapiv1alpha3.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
+						Name: fmt.Sprintf("%s:80", host),
+						Route: &istioapiv1alpha3.EnvoyFilter_RouteConfigurationMatch_RouteMatch{
+							Action: istioapiv1alpha3.EnvoyFilter_RouteConfigurationMatch_RouteMatch_ANY,
+						},
+					},
+				},
+			},
+		},
+		Patch: patch,
+	}
+}
+
+func preAuthHTTPFilterEnvoyPatch(apip *networkingv1beta1.APIProduct) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+	// The patch inserts the envoy.filters.http.preauth.ratelimit HTTP filter into the HTTP_FILTER chain,
+	// BEFORE the external AUTH HTTP filter.
 	// The rate_limit_service field specifies the external rate limit service, rate_limit_cluster in this case.
+	// https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/ratelimit/v3/rate_limit.proto.html
 	patchUnstructured := map[string]interface{}{
 		"operation": "INSERT_BEFORE",
 		"value": map[string]interface{}{
-			"name": "envoy.filters.http.ratelimit",
+			"name": "envoy.filters.http.preauth.ratelimit",
 			"typed_config": map[string]interface{}{
 				"@type":             "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit",
 				"domain":            apip.RateLimitDomainName(),
+				"stage":             PreAuthStage,
+				"failure_mode_deny": true,
+				"rate_limit_service": map[string]interface{}{
+					"transport_api_version": "V3",
+					"grpc_service": map[string]interface{}{
+						"timeout": "3s",
+						"envoy_grpc": map[string]string{
+							"cluster_name": "rate_limit_cluster",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	patchRaw, err := json.Marshal(patchUnstructured)
+	if err != nil {
+		panic(err)
+	}
+
+	patch := &istioapiv1alpha3.EnvoyFilter_Patch{}
+	err = patch.UnmarshalJSON(patchRaw)
+	if err != nil {
+		panic(err)
+	}
+
+	// insert global rate limit http filter before external AUTH
+	return &istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
+		ApplyTo: istioapiv1alpha3.EnvoyFilter_HTTP_FILTER,
+		Match: &istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
+			Context: istioapiv1alpha3.EnvoyFilter_GATEWAY,
+			ObjectTypes: &istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
+				Listener: &istioapiv1alpha3.EnvoyFilter_ListenerMatch{
+					FilterChain: &istioapiv1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
+						Filter: &istioapiv1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
+							Name: "envoy.filters.network.http_connection_manager",
+							SubFilter: &istioapiv1alpha3.EnvoyFilter_ListenerMatch_SubFilterMatch{
+								Name: "envoy.filters.http.ext_authz",
+							},
+						},
+					},
+				},
+			},
+		},
+		Patch: patch,
+	}
+}
+
+func postAuthHTTPFilterEnvoyPatch(apip *networkingv1beta1.APIProduct) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+	// The patch inserts the envoy.filters.http.postauth.ratelimit HTTP filter into the HTTP_FILTER chain,
+	// AFTER the external AUTH HTTP filter.
+	// The rate_limit_service field specifies the external rate limit service, rate_limit_cluster in this case.
+	patchUnstructured := map[string]interface{}{
+		"operation": "INSERT_AFTER",
+		"value": map[string]interface{}{
+			"name": "envoy.filters.http.postauth.ratelimit",
+			"typed_config": map[string]interface{}{
+				"@type":             "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit",
+				"domain":            apip.RateLimitDomainName(),
+				"stage":             PostAuthStage,
 				"failure_mode_deny": true,
 				"rate_limit_service": map[string]interface{}{
 					"transport_api_version": "V3",
