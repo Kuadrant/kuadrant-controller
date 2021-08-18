@@ -52,6 +52,7 @@ type IstioProvider struct {
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=virtualservices,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch
+// +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
 
 func New(baseReconciler *reconcilers.BaseReconciler) *IstioProvider {
 	// Register the Istio Scheme into the client, so we can interact with istio objects.
