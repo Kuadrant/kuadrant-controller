@@ -119,6 +119,26 @@ func buildAuthConfig(apip *networkingv1beta1.APIProduct) (*authorino.AuthConfig,
 		authConfig.Spec.Response = append(authConfig.Spec.Response, response)
 	}
 
+	if apip.AuthRateLimit() != nil && apip.HasOIDCAuth() {
+		response := &authorino.Response{
+			Name:       "rate-limit-oidc",
+			Wrapper:    authorino.Response_Wrapper("envoyDynamicMetadata"),
+			WrapperKey: "ext_auth_data",
+			JSON: &authorino.Response_DynamicJSON{
+				Properties: []authorino.JsonProperty{
+					{
+						Name: "user-id",
+						ValueFrom: authorino.ValueFromAuthJSON{
+							AuthJSON: `auth.identity.sub`,
+						},
+					},
+				},
+			},
+		}
+
+		authConfig.Spec.Response = append(authConfig.Spec.Response, response)
+	}
+
 	return authConfig, nil
 }
 

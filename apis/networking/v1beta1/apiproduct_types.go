@@ -236,6 +236,16 @@ func (a *APIProduct) HasAPIKeyAuth() bool {
 	return false
 }
 
+func (a *APIProduct) HasOIDCAuth() bool {
+	for _, securityScheme := range a.Spec.SecurityScheme {
+		if securityScheme.OpenIDConnectAuth != nil {
+			return true
+		}
+	}
+
+	return false
+}
+
 //+kubebuilder:object:root=true
 
 // APIProductList contains a list of APIProduct
