@@ -7,9 +7,9 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - config.authorino.3scale.net
+  - authorino.3scale.net
   resources:
-  - services
+  - authconfigs
   verbs:
   - create
   - delete

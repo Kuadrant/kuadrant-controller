@@ -23,7 +23,7 @@ type Provider struct {
 	logger logr.Logger
 }
 
-// +kubebuilder:rbac:groups=config.authorino.3scale.net,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=authorino.3scale.net,resources=authconfigs,verbs=get;list;watch;create;update;patch;delete
 
 func New(baseReconciler *reconcilers.BaseReconciler) *Provider {
 	utilruntime.Must(authorino.AddToScheme(baseReconciler.Scheme()))
@@ -42,12 +42,12 @@ func (a *Provider) Reconcile(ctx context.Context, apip *networkingv1beta1.APIPro
 	log := a.Logger().WithValues("apiproduct", client.ObjectKeyFromObject(apip))
 	log.V(1).Info("Reconcile")
 
-	serviceConfig, err := APIProductToServiceConfigs(apip)
+	authConfig, err := buildAuthConfig(apip)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	err = a.ReconcileAuthorinoService(ctx, serviceConfig, authorinoServiceBasicMutator)
+	err = a.ReconcileAuthorinoAuthConfig(ctx, authConfig, authorinoAuthConfigBasicMutator)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -55,17 +55,17 @@ func (a *Provider) Reconcile(ctx context.Context, apip *networkingv1beta1.APIPro
 	return ctrl.Result{}, nil
 }
 
-func (a *Provider) ReconcileAuthorinoService(ctx context.Context, desired *authorino.Service, mutatefn reconcilers.MutateFn) error {
-	return a.ReconcileResource(ctx, &authorino.Service{}, desired, mutatefn)
+func (a *Provider) ReconcileAuthorinoAuthConfig(ctx context.Context, desired *authorino.AuthConfig, mutatefn reconcilers.MutateFn) error {
+	return a.ReconcileResource(ctx, &authorino.AuthConfig{}, desired, mutatefn)
 }
 
-func APIProductToServiceConfigs(apip *networkingv1beta1.APIProduct) (*authorino.Service, error) {
-	serviceConfig := &authorino.Service{
+func buildAuthConfig(apip *networkingv1beta1.APIProduct) (*authorino.AuthConfig, error) {
+	authConfig := &authorino.AuthConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      apip.Name + apip.Namespace,
 			Namespace: common.KuadrantNamespace,
 		},
-		Spec: authorino.ServiceSpec{
+		Spec: authorino.AuthConfigSpec{
 			Hosts:         apip.Spec.Routing.Hosts,
 			Identity:      nil,
 			Metadata:      nil,
@@ -94,9 +94,9 @@ func APIProductToServiceConfigs(apip *networkingv1beta1.APIProduct) (*authorino.
 				Endpoint: securityScheme.OpenIDConnectAuth.URL,
 			}
 		}
-		serviceConfig.Spec.Identity = append(serviceConfig.Spec.Identity, &identity)
+		authConfig.Spec.Identity = append(authConfig.Spec.Identity, &identity)
 	}
-	return serviceConfig, nil
+	return authConfig, nil
 }
 
 func (a *Provider) Delete(ctx context.Context, apip *networkingv1beta1.APIProduct) (err error) {
@@ -111,13 +111,13 @@ func (a *Provider) Status(ctx context.Context, apip *networkingv1beta1.APIProduc
 
 	// Right now, we just try to get all the objects that should have been created, and check their status.
 	// If any object is missing/not-created, Status returns false.
-	serviceConfig, err := APIProductToServiceConfigs(apip)
+	authConfig, err := buildAuthConfig(apip)
 	if err != nil {
 		return false, err
 	}
 
-	existingServiceConfig := &authorino.Service{}
-	err = a.Client().Get(ctx, client.ObjectKeyFromObject(serviceConfig), existingServiceConfig)
+	existingAuthConfig := &authorino.AuthConfig{}
+	err = a.Client().Get(ctx, client.ObjectKeyFromObject(authConfig), existingAuthConfig)
 	if err != nil && errors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
@@ -131,14 +131,14 @@ func (a *Provider) Status(ctx context.Context, apip *networkingv1beta1.APIProduc
 	return true, nil
 }
 
-func authorinoServiceBasicMutator(existingObj, desiredObj client.Object) (bool, error) {
-	existing, ok := existingObj.(*authorino.Service)
+func authorinoAuthConfigBasicMutator(existingObj, desiredObj client.Object) (bool, error) {
+	existing, ok := existingObj.(*authorino.AuthConfig)
 	if !ok {
-		return false, fmt.Errorf("%T is not a *authorino.Service", existingObj)
+		return false, fmt.Errorf("%T is not a *authorino.AuthConfig", existingObj)
 	}
-	desired, ok := desiredObj.(*authorino.Service)
+	desired, ok := desiredObj.(*authorino.AuthConfig)
 	if !ok {
-		return false, fmt.Errorf("%T is not a *authorino.Service", desiredObj)
+		return false, fmt.Errorf("%T is not a *authorino.AuthConfig", desiredObj)
 	}
 
 	updated := false
