@@ -90,8 +90,10 @@ func (a *APISelector) APINamespacedName() types.NamespacedName {
 }
 
 type InfraRateLimitSpec struct {
-	MaxValue int32 `json:"max_value"`
-	Period   int32 `json:"period_in_seconds"`
+	// MaxValue represents the number of requests allowed per defined period of time.
+	MaxValue int32 `json:"maxValue"`
+	// Period represents the period of time in seconds.
+	Period int32 `json:"period"`
 }
 
 // APIProductSpec defines the desired state of APIProduct

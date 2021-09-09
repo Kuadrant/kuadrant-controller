@@ -31,5 +31,5 @@ spec:
             secret.kuadrant.io/managed-by: authorino
             api: animaltoys
   rateLimit:
-    max_value: 10
-    period_in_seconds: 60
+    maxValue: 10
+    period: 60

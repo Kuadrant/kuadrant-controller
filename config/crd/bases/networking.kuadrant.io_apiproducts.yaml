@@ -72,15 +72,18 @@ spec:
               rateLimit:
                 description: Select a HTTP route by matching the HTTP request path.
                 properties:
-                  max_value:
+                  maxValue:
+                    description: MaxValue represents the number of requests allowed
+                      per defined period of time.
                     format: int32
                     type: integer
-                  period_in_seconds:
+                  period:
+                    description: Period represents the period of time in seconds.
                     format: int32
                     type: integer
                 required:
-                - max_value
-                - period_in_seconds
+                - maxValue
+                - period
                 type: object
               routing:
                 properties:
