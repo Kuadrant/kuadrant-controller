@@ -42,12 +42,9 @@ func (a *Provider) Reconcile(ctx context.Context, apip *networkingv1beta1.APIPro
 	log := a.Logger().WithValues("apiproduct", client.ObjectKeyFromObject(apip))
 	log.V(1).Info("Reconcile")
 
-	authConfig, err := buildAuthConfig(apip)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	authConfig := buildAuthConfig(apip)
 
-	err = a.ReconcileAuthorinoAuthConfig(ctx, authConfig, authorinoAuthConfigBasicMutator)
+	err := a.ReconcileAuthorinoAuthConfig(ctx, authConfig, authorinoAuthConfigBasicMutator)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -59,7 +56,7 @@ func (a *Provider) ReconcileAuthorinoAuthConfig(ctx context.Context, desired *au
 	return a.ReconcileResource(ctx, &authorino.AuthConfig{}, desired, mutatefn)
 }
 
-func buildAuthConfig(apip *networkingv1beta1.APIProduct) (*authorino.AuthConfig, error) {
+func buildAuthConfig(apip *networkingv1beta1.APIProduct) *authorino.AuthConfig {
 	authConfig := &authorino.AuthConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      apip.Name + apip.Namespace,
@@ -139,7 +136,7 @@ func buildAuthConfig(apip *networkingv1beta1.APIProduct) (*authorino.AuthConfig,
 		authConfig.Spec.Response = append(authConfig.Spec.Response, response)
 	}
 
-	return authConfig, nil
+	return authConfig
 }
 
 func (a *Provider) Delete(ctx context.Context, apip *networkingv1beta1.APIProduct) (err error) {
@@ -148,19 +145,16 @@ func (a *Provider) Delete(ctx context.Context, apip *networkingv1beta1.APIProduc
 	return nil
 }
 
-func (a *Provider) Status(ctx context.Context, apip *networkingv1beta1.APIProduct) (ready bool, err error) {
+func (a *Provider) Status(ctx context.Context, apip *networkingv1beta1.APIProduct) (bool, error) {
 	log := a.Logger().WithValues("apiproduct", client.ObjectKeyFromObject(apip))
 	log.V(1).Info("Status")
 
 	// Right now, we just try to get all the objects that should have been created, and check their status.
 	// If any object is missing/not-created, Status returns false.
-	authConfig, err := buildAuthConfig(apip)
-	if err != nil {
-		return false, err
-	}
+	authConfig := buildAuthConfig(apip)
 
 	existingAuthConfig := &authorino.AuthConfig{}
-	err = a.Client().Get(ctx, client.ObjectKeyFromObject(authConfig), existingAuthConfig)
+	err := a.Client().Get(ctx, client.ObjectKeyFromObject(authConfig), existingAuthConfig)
 	if err != nil && errors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
