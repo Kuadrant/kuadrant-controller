@@ -58,12 +58,17 @@ func (p *Provider) Reconcile(ctx context.Context, apip *networkingv1beta1.APIPro
 	log := p.Logger().WithValues("apiproduct", client.ObjectKeyFromObject(apip))
 	log.V(1).Info("Reconcile")
 
-	err := p.ReconcileRateLimit(ctx, p.basicPreAuthRateLimit(apip), rateLimitBasicMutator)
+	err := p.ReconcileRateLimit(ctx, p.globalRateLimit(apip), rateLimitBasicMutator)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	err = p.ReconcileRateLimit(ctx, p.basicAuthRateLimit(apip), rateLimitBasicMutator)
+	err = p.ReconcileRateLimit(ctx, p.perRemoteIPRateLimit(apip), rateLimitBasicMutator)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	err = p.ReconcileRateLimit(ctx, p.authenticatedRateLimit(apip), rateLimitBasicMutator)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -78,16 +83,23 @@ func (p *Provider) Delete(ctx context.Context, apip *networkingv1beta1.APIProduc
 		return nil
 	}
 
-	desiredPreAuthRateLimit := p.basicPreAuthRateLimit(apip)
-	err := p.DeleteResource(ctx, desiredPreAuthRateLimit)
-	log.V(1).Info("Removing preAuth RateLimit", "ratelimit", client.ObjectKeyFromObject(desiredPreAuthRateLimit), "error", err)
+	desiredGlobalRateLimit := p.globalRateLimit(apip)
+	err := p.DeleteResource(ctx, desiredGlobalRateLimit)
+	log.V(1).Info("Removing global RateLimit", "ratelimit", client.ObjectKeyFromObject(desiredGlobalRateLimit), "error", err)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
-	desiredAuthRateLimit := p.basicAuthRateLimit(apip)
-	err = p.DeleteResource(ctx, desiredAuthRateLimit)
-	log.V(1).Info("Removing auth RateLimit", "ratelimit", client.ObjectKeyFromObject(desiredAuthRateLimit), "error", err)
+	desiredperRemoteIPRateLimit := p.perRemoteIPRateLimit(apip)
+	err = p.DeleteResource(ctx, desiredperRemoteIPRateLimit)
+	log.V(1).Info("Removing perRemoteIP RateLimit", "ratelimit", client.ObjectKeyFromObject(desiredperRemoteIPRateLimit), "error", err)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	authenticatedAuthRateLimit := p.authenticatedRateLimit(apip)
+	err = p.DeleteResource(ctx, authenticatedAuthRateLimit)
+	log.V(1).Info("Removing auth RateLimit", "ratelimit", client.ObjectKeyFromObject(authenticatedAuthRateLimit), "error", err)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -104,18 +116,27 @@ func (p *Provider) Status(ctx context.Context, apip *networkingv1beta1.APIProduc
 
 	// Right now, we just try to get all the objects that should have been created, and check their status.
 	// If any object is missing/not-created, Status returns false.
-	desiredPreAuthRateLimit := p.basicPreAuthRateLimit(apip)
+	desiredGlobalRateLimit := p.globalRateLimit(apip)
 	existing := &limitadorv1alpha1.RateLimit{}
-	err := p.GetResource(ctx, client.ObjectKeyFromObject(desiredPreAuthRateLimit), existing)
+	err := p.GetResource(ctx, client.ObjectKeyFromObject(desiredGlobalRateLimit), existing)
 	if err != nil && apierrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
 		return false, err
 	}
 
-	desiredAuthRateLimit := p.basicAuthRateLimit(apip)
+	desiredperRemoteIPRateLimit := p.perRemoteIPRateLimit(apip)
 	existing = &limitadorv1alpha1.RateLimit{}
-	err = p.GetResource(ctx, client.ObjectKeyFromObject(desiredAuthRateLimit), existing)
+	err = p.GetResource(ctx, client.ObjectKeyFromObject(desiredperRemoteIPRateLimit), existing)
+	if err != nil && apierrors.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	authenticatedAuthRateLimit := p.authenticatedRateLimit(apip)
+	existing = &limitadorv1alpha1.RateLimit{}
+	err = p.GetResource(ctx, client.ObjectKeyFromObject(authenticatedAuthRateLimit), existing)
 	if err != nil && apierrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
@@ -125,10 +146,10 @@ func (p *Provider) Status(ctx context.Context, apip *networkingv1beta1.APIProduc
 	return true, nil
 }
 
-func (p *Provider) basicPreAuthRateLimit(apip *networkingv1beta1.APIProduct) *limitadorv1alpha1.RateLimit {
-	key := basicPreAuthRateLimitKey(apip)
+func (p *Provider) globalRateLimit(apip *networkingv1beta1.APIProduct) *limitadorv1alpha1.RateLimit {
+	key := globalRateLimitKey(apip)
 
-	rateLimitSpec := apip.PreAuthRateLimit()
+	rateLimitSpec := apip.GlobalRateLimit()
 
 	var rateLimit *limitadorv1alpha1.RateLimit
 	if rateLimitSpec == nil {
@@ -139,9 +160,36 @@ func (p *Provider) basicPreAuthRateLimit(apip *networkingv1beta1.APIProduct) *li
 		common.TagObjectToDelete(rateLimit)
 	} else {
 		factory := RateLimitFactory{
-			Key:       key,
-			Namespace: apip.RateLimitDomainName(),
-			// Descriptor configured in EnvoyFilter in the rateLimitActionsEnvoyPatch method
+			Key:        key,
+			Namespace:  apip.RateLimitDomainName(),
+			Conditions: []string{"generic_key == kuadrant"},
+			Variables:  []string{},
+			MaxValue:   int(rateLimitSpec.MaxValue),
+			Seconds:    int(rateLimitSpec.Period),
+		}
+
+		rateLimit = factory.RateLimit()
+	}
+
+	return rateLimit
+}
+
+func (p *Provider) perRemoteIPRateLimit(apip *networkingv1beta1.APIProduct) *limitadorv1alpha1.RateLimit {
+	key := perRemoteIPRateLimitKey(apip)
+
+	rateLimitSpec := apip.PerRemoteIPRateLimit()
+
+	var rateLimit *limitadorv1alpha1.RateLimit
+	if rateLimitSpec == nil {
+		// create just with the key and tag to delete
+		factory := RateLimitFactory{Key: key}
+		rateLimit = factory.RateLimit()
+
+		common.TagObjectToDelete(rateLimit)
+	} else {
+		factory := RateLimitFactory{
+			Key:        key,
+			Namespace:  apip.RateLimitDomainName(),
 			Conditions: []string{},
 			Variables:  []string{"remote_address"},
 			MaxValue:   int(rateLimitSpec.MaxValue),
@@ -154,8 +202,8 @@ func (p *Provider) basicPreAuthRateLimit(apip *networkingv1beta1.APIProduct) *li
 	return rateLimit
 }
 
-func (p *Provider) basicAuthRateLimit(apip *networkingv1beta1.APIProduct) *limitadorv1alpha1.RateLimit {
-	key := basicAuthRateLimitKey(apip)
+func (p *Provider) authenticatedRateLimit(apip *networkingv1beta1.APIProduct) *limitadorv1alpha1.RateLimit {
+	key := authenticatedRateLimitKey(apip)
 
 	rateLimitSpec := apip.AuthRateLimit()
 
@@ -205,12 +253,17 @@ func rateLimitBasicMutator(existingObj, desiredObj client.Object) (bool, error) 
 	return updated, nil
 }
 
-func basicPreAuthRateLimitKey(apip *networkingv1beta1.APIProduct) client.ObjectKey {
+func globalRateLimitKey(apip *networkingv1beta1.APIProduct) client.ObjectKey {
 	// APIProduct name/namespace should be unique in the cluster
-	return types.NamespacedName{Name: fmt.Sprintf("%s.%s-preauth", apip.Name, apip.Namespace), Namespace: common.KuadrantNamespace}
+	return types.NamespacedName{Name: fmt.Sprintf("%s.%s-global", apip.Name, apip.Namespace), Namespace: common.KuadrantNamespace}
 }
 
-func basicAuthRateLimitKey(apip *networkingv1beta1.APIProduct) client.ObjectKey {
+func perRemoteIPRateLimitKey(apip *networkingv1beta1.APIProduct) client.ObjectKey {
 	// APIProduct name/namespace should be unique in the cluster
-	return types.NamespacedName{Name: fmt.Sprintf("%s.%s-postauth", apip.Name, apip.Namespace), Namespace: common.KuadrantNamespace}
+	return types.NamespacedName{Name: fmt.Sprintf("%s.%s-remoteip", apip.Name, apip.Namespace), Namespace: common.KuadrantNamespace}
+}
+
+func authenticatedRateLimitKey(apip *networkingv1beta1.APIProduct) client.ObjectKey {
+	// APIProduct name/namespace should be unique in the cluster
+	return types.NamespacedName{Name: fmt.Sprintf("%s.%s-authenticated", apip.Name, apip.Namespace), Namespace: common.KuadrantNamespace}
 }

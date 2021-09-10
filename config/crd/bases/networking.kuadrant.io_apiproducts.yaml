@@ -73,8 +73,8 @@ spec:
                 description: RateLimit configures global rate limit parameters
                 properties:
                   authenticated:
-                    description: AuthRateLimit configures global rate limit parameters
-                      per user_id
+                    description: AuthRateLimit configures the same rate limit parameters
+                      per each authenticated client
                     properties:
                       maxValue:
                         description: MaxValue represents the number of requests allowed
@@ -89,9 +89,26 @@ spec:
                     - maxValue
                     - period
                     type: object
-                  preAuthenticated:
-                    description: PreAuthRateLimitSpec configures rate limit parameters
-                      per remote address
+                  global:
+                    description: Global configures a single global rate limit for
+                      all requests.
+                    properties:
+                      maxValue:
+                        description: MaxValue represents the number of requests allowed
+                          per defined period of time.
+                        format: int32
+                        type: integer
+                      period:
+                        description: Period represents the period of time in seconds.
+                        format: int32
+                        type: integer
+                    required:
+                    - maxValue
+                    - period
+                    type: object
+                  perRemoteIP:
+                    description: PerRemoteIPRateLimit configures the same rate limit
+                      parameters per each remote address
                     properties:
                       maxValue:
                         description: MaxValue represents the number of requests allowed

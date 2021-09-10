@@ -89,14 +89,7 @@ func (a *APISelector) APINamespacedName() types.NamespacedName {
 	return types.NamespacedName{Namespace: a.Namespace, Name: name}
 }
 
-type AuthRateLimitSpec struct {
-	// MaxValue represents the number of requests allowed per defined period of time.
-	MaxValue int32 `json:"maxValue"`
-	// Period represents the period of time in seconds.
-	Period int32 `json:"period"`
-}
-
-type PreAuthRateLimitSpec struct {
+type RateLimitDefinitionSpec struct {
 	// MaxValue represents the number of requests allowed per defined period of time.
 	MaxValue int32 `json:"maxValue"`
 	// Period represents the period of time in seconds.
@@ -104,13 +97,17 @@ type PreAuthRateLimitSpec struct {
 }
 
 type RateLimitSpec struct {
-	// PreAuthRateLimitSpec configures rate limit parameters per remote address
+	// Global configures a single global rate limit for all requests.
 	// +optional
-	PreAuthRateLimit *PreAuthRateLimitSpec `json:"preAuthenticated,omitempty"`
+	GlobalRateLimit *RateLimitDefinitionSpec `json:"global,omitempty"`
 
-	// AuthRateLimit configures global rate limit parameters per user_id
+	// PerRemoteIPRateLimit configures the same rate limit parameters per each remote address
 	// +optional
-	AuthRateLimit *AuthRateLimitSpec `json:"authenticated,omitempty"`
+	PerRemoteIPRateLimit *RateLimitDefinitionSpec `json:"perRemoteIP,omitempty"`
+
+	// AuthRateLimit configures the same rate limit parameters per each authenticated client
+	// +optional
+	AuthRateLimit *RateLimitDefinitionSpec `json:"authenticated,omitempty"`
 }
 
 // APIProductSpec defines the desired state of APIProduct
@@ -206,15 +203,23 @@ func (a *APIProduct) RateLimitDomainName() string {
 	return fmt.Sprintf("%s.%s", a.Name, a.Namespace)
 }
 
-func (a *APIProduct) PreAuthRateLimit() *PreAuthRateLimitSpec {
+func (a *APIProduct) GlobalRateLimit() *RateLimitDefinitionSpec {
 	if a.Spec.RateLimit == nil {
 		return nil
 	}
 
-	return a.Spec.RateLimit.PreAuthRateLimit
+	return a.Spec.RateLimit.GlobalRateLimit
 }
 
-func (a *APIProduct) AuthRateLimit() *AuthRateLimitSpec {
+func (a *APIProduct) PerRemoteIPRateLimit() *RateLimitDefinitionSpec {
+	if a.Spec.RateLimit == nil {
+		return nil
+	}
+
+	return a.Spec.RateLimit.PerRemoteIPRateLimit
+}
+
+func (a *APIProduct) AuthRateLimit() *RateLimitDefinitionSpec {
 	if a.Spec.RateLimit == nil {
 		return nil
 	}
@@ -223,7 +228,14 @@ func (a *APIProduct) AuthRateLimit() *AuthRateLimitSpec {
 }
 
 func (a *APIProduct) IsRateLimitEnabled() bool {
-	return a.AuthRateLimit() != nil || a.PreAuthRateLimit() != nil
+	return a.AuthRateLimit() != nil ||
+		a.PerRemoteIPRateLimit() != nil ||
+		a.GlobalRateLimit() != nil
+}
+
+func (a *APIProduct) IsPreAuthRateLimitEnabled() bool {
+	return a.PerRemoteIPRateLimit() != nil ||
+		a.GlobalRateLimit() != nil
 }
 
 func (a *APIProduct) HasAPIKeyAuth() bool {

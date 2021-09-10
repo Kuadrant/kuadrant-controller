@@ -84,7 +84,7 @@ func preAuthEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1al
 		Patches:    make([]*istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, 0),
 	}
 
-	if apip.PreAuthRateLimit() == nil {
+	if !apip.IsPreAuthRateLimitEnabled() {
 		envoyFilter := factory.EnvoyFilter()
 		common.TagObjectToDelete(envoyFilter)
 		return envoyFilter
@@ -93,7 +93,7 @@ func preAuthEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1al
 	factory.Patches = append(factory.Patches, preAuthHTTPFilterEnvoyPatch(apip))
 
 	for _, host := range apip.Spec.Routing.Hosts {
-		factory.Patches = append(factory.Patches, preAuthActionsEnvoyPatch(host))
+		factory.Patches = append(factory.Patches, preAuthActionsEnvoyPatch(apip, host))
 	}
 
 	return factory.EnvoyFilter()
@@ -121,19 +121,30 @@ func postAuthEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1a
 	return factory.EnvoyFilter()
 }
 
-func preAuthActionsEnvoyPatch(host string) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+func preAuthActionsEnvoyPatch(apip *networkingv1beta1.APIProduct, host string) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+	actions := []map[string]interface{}{}
+	if apip.GlobalRateLimit() != nil {
+		action := map[string]interface{}{
+			"generic_key": map[string]string{"descriptor_value": "kuadrant"},
+		}
+		actions = append(actions, action)
+	}
+
+	if apip.PerRemoteIPRateLimit() != nil {
+		action := map[string]interface{}{
+			"remote_address": map[string]interface{}{},
+		}
+		actions = append(actions, action)
+	}
+
 	// defines the route configuration on which to rate limit
 	patchUnstructured := map[string]interface{}{
 		"operation": "MERGE",
 		"value": map[string]interface{}{
 			"rate_limits": []map[string]interface{}{
 				{
-					"stage": PreAuthStage,
-					"actions": []map[string]interface{}{
-						{
-							"remote_address": map[string]interface{}{},
-						},
-					},
+					"stage":   PreAuthStage,
+					"actions": actions,
 				},
 			},
 		},
