@@ -1,172 +1,127 @@
-# kuadrant-controller
+# Kuadrant Controller
 
+[![Code Style](https://github.com/Kuadrant/kuadrant-controller/actions/workflows/code-style.yaml/badge.svg)](https://github.com/Kuadrant/kuadrant-controller/actions/workflows/code-style.yaml)
+[![Testing](https://github.com/Kuadrant/kuadrant-controller/actions/workflows/testing.yaml/badge.svg)](https://github.com/Kuadrant/kuadrant-controller/actions/workflows/testing.yaml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
+## Table of contents
+
+TODO
+
 ## Overview
-Kuadrant is a re-architecture of API Management using Cloud Native concepts and separating the components to be less coupled, more reusable and leverage the underlying platform.
 
-## Service Discovery
+Kuadrant is a re-architecture of API Management using Cloud Native concepts and separating the components to be less coupled,
+more reusable and leverage the underlying kubernetes platform. It aims to deliver a smooth experience to providers and consumers
+of applications & services when it comes to rate limiting, authentication, authorization, discoverability, change management, usage contracts, insights, etc.
 
-When adding a new application that contains an API, to reduce the number of objects that a user has to author,
-Kuadrant can leverage annotations. A good place to annotate is the Service used to drive traffic to the user API.
+Kuadrant aims to produce a set of loosely coupled functionalities built directly on top of Kubernetes.
+Furthermore it only strives to provide what Kubernetes doesn’t offer out of the box, i.e. Kuadrant won’t be designing a new Gateway/proxy,
+instead it will opt to connect with what’s there and what’s being developed (think Envoy, GatewayAPI).
 
-### Annotations:
+Kuadrant is a system of cloud-native k8s components that grows as users’ needs grow.
+* From simple protection of a Service (via AuthN) that is used by teammates working on the same cluster, or “sibling” services, up to Auth of users using OIDC plus custom policies.
+* From no rate-limiting to rate-limiting for global service protection on to rate-limiting by users/plans
 
-- **discovery.kuadrant.io/scheme**: *OPTIONAL* Either HTTP or HTTPS specifies how the kuadrant gateway will connect to this API.
-- **discovery.kuadrant.io/api-name**: *OPTIONAL* If not set, the name of the API can be matched with the service name.
-- **discovery.kuadrant.io/tag**: *OPTIONAL* A special tag used to distinguish this deployment between several instances of the API.
-- **discovery.kuadrant.io/port**: *OPTIONAL* Only required if there are multiple ports in the service. Either the Name of the port or the Number.
-- **discovery.kuadrant.io/oas-configmap**: *OPTIONAL* Configmap that contains the OAS spec.
-- **discovery.kuadrant.io/matchpath**: *OPTIONAL* Define a single specific path, prefix or regex. Defaults to `/`.
-- **discovery.kuadrant.io/matchpath-type**: *OPTIONAL* Specifies how to match against the `matchpath` value. Accepted values are `Exact`, `Prefix` and `RegularExpression`. Defaults to `Prefix`.
-- **discovery.kuadrant.io/oas-path**: *OPTIONAL* Define a specific path for retrieving the config from the service itself.
-- **discovery.kuadrant.io/oas-name-port**: *OPTIONAL* The port to be used to retrieve the OAS config, if not defined, it will used the first one
+towards a full system that is more analogous to current API Management systems where business rules
+and plans define protections and Business/User related Analytics are available.
 
-### Labels:
-- **discovery.kuadrant.io/enabled:**: *REQUIRED* true or false, marks the object to be discovered by kuadrant.
+Kuadrant relies on [Istio](https://istio.io/) to operate the
+[istio ingress gateway](https://istio.io/latest/docs/reference/config/networking/gateway/)
+to provide API management with authentication and rate limit capabilities. Kuadrant configures, optionally,
+the integration of the [istio ingress gateway](https://istio.io/latest/docs/reference/config/networking/gateway/)
+with few kuadrant components to provide the aforementioned capabilities.
 
+* The AuthN/AuthZ enforcer [Authorino](https://github.com/Kuadrant/authorino)
+* The rate limit service [Limitador](https://github.com/Kuadrant/limitador) which exposes a [GRPC] service implementing the [Envoy Rate Limit protocol (v3)](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ratelimit/v3/rls.proto).
 
-Example of a kuadrant annotated service providing OpenAPI spec in a configmap.
+![Kuadrant overview](doc/kuadrant-overview.svg)
 
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: cats-api
-  annotations:
-    discovery.kuadrant.io/scheme: "http"
-    discovery.kuadrant.io/api-name: "cats"
-    discovery.kuadrant.io/tag: "production"
-    discovery.kuadrant.io/port: "80"
-    discovery.kuadrant.io/oas-configmap: "cats-oas"
-  labels:
-    discovery.kuadrant.io/enabled: "true"
-spec:
-  selector:
-    svc: cats
-  ports:
-    - port: 80
-      protocol: TCP
-      targetPort: 3000
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cats-oas
-data:
-  openapi.yaml: |
-    openapi: "3.0.0"
-    info:
-      title: "toy API"
-    version: "1.0.0"
-    servers:
-      - url: http://toys/
-    paths:
-      /toys:
-        get:
-          operationId: "getToys"
+The kuadrant controller is the component reading the customer desired configuration
+(declaratively as kubernetes custom resources) and ensures all components
+are configured to obey customer's desired behavior.
+
+## CustomResourceDefinitions
+
+A core feature of the kuadrant controller is to monitor the Kubernetes API server for changes to
+specific objects and ensure the owned k8s components configuration match these objects.
+The kuadrant controller acts on the following [CRDs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/):
+
+* [API](apis/networking/v1beta1/api_types.go): defines the kuadrant association to a kubernetes service object being the entry point of the API protected.
+* [APIProduct](apis/networking/v1beta1/apiproduct_types.go): defines a desired API Product configuration for a set of kuadrant APIs.
+
+## Getting Started
+
+This guide lets you quickly evaluate Kuadrant.
+
+### Requirements
+
+* Having a [Kubernetes](https://kubernetes.io/) (1.19, 1.20, 1.21, 1.22) cluster up and running.
+* Permission from the Kubernetes cluster to create Custom Resource Definitions (CRDs) during kuadrant's installation. Cluster administrators can handle this requirement through the Kubernetes API Role-Based Access Control bindings.
+* A deployed [kubernetes service](https://kubernetes.io/docs/concepts/services-networking/service/) in the cluster acting as the entry point for your API.
+* Golang 1.16 environment. Download and install steps [here](https://golang.org/doc/install)
+
+**NOTE**: You can easily have a local cluster setup using [Kind](https://kind.sigs.k8s.io/). In this case, the requirement is to have [Docker](https://docker.com/).
+
+### Download kuadrantctl tool
+
+[`kuadrantctl`](https://github.com/Kuadrant/kuadrantctl) is the kuadrant configuration command line utility.
+Currently `kuadrantctl install` command is the recommended installation method of kuadrant.
+
+Download the latest release
+
+```bash
+go install github.com/kuadrant/kuadrantctl@latest
 ```
 
-Example of a kuadrant annotated service with a `catch-all` match path.
+### Install kuadrant
 
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: dogs-api
-  annotations:
-    discovery.kuadrant.io/scheme: "http"
-    discovery.kuadrant.io/api-name: "dogs"
-    discovery.kuadrant.io/tag: "production"
-    discovery.kuadrant.io/port: "80"
-    discovery.kuadrant.io/matchpath: "/"
-    discovery.kuadrant.io/matchpath-type: Prefix
-  labels:
-    discovery.kuadrant.io/enabled: "true"
-spec:
-  selector:
-    svc: dogs
-  ports:
-    - port: 80
-      protocol: TCP
-      targetPort: 3000
+The install command will create a namespace called `kuadrant-system` and deploy kuadrant services in that namespace.
+
+```bash
+kuadrantctl install
 ```
 
-Example of a kuadrant annotated service providing OpenAPI spec in the service.
+On successfull command return, you should see the following deployments and pods created.
 
-```yaml
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: petstore
-  name: petstore
-spec:
-  selector:
-    matchLabels:
-      app: petstore
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: petstore
-    spec:
-      containers:
-      - command:
-        - /petstore
-        image: quay.io/eastizle/petstore:1.0.0
-        imagePullPolicy: Always
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        name: petstore
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 10
----
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    discovery.kuadrant.io/scheme: "http"
-    discovery.kuadrant.io/api-name: "petstore"
-    discovery.kuadrant.io/tag: "production"
-    discovery.kuadrant.io/port: api
-    discovery.kuadrant.io/oas-path: "/openapi"
-    discovery.kuadrant.io/oas-name-port: openapi
-  labels:
-    discovery.kuadrant.io/enabled: "true"
-    app: petstore
-  name: petstore
-spec:
-  ports:
-  - name: api
-    port: 8080
-    targetPort: 8080
-  - name: openapi
-    port: 9090
-    targetPort: 9090
-  selector:
-    app: petstore
+```bash
+❯ k get pods -n kuadrant-system
+NAME                                                     READY   STATUS    RESTARTS   AGE
+authorino-controller-manager-XXXXXXXXXXX-XXXX            2/2     Running   0          3m6s
+istiod-XXXXXXXXXX-XXXXX                                  1/1     Running   0          3m11s
+kuadrant-controller-manager-XXXXXXXXXX-XXXX              2/2     Running   0          3m5s
+kuadrant-gateway-XXXXXXXXXX-XXXX                         1/1     Running   0          3m5s
+limitador-XXXXXXXXXX-XXXXX                               1/1     Running   0          2m13s
+limitador-operator-controller-manager-XXXXXXXXXX-XXXXX   2/2     Running   0          3m6s
+
+
+❯ k get deployments -n kuadrant-system
+NAME                                    READY   UP-TO-DATE   AVAILABLE   AGE
+authorino-controller-manager            1/1     1            1           4m51s
+istiod                                  1/1     1            1           4m57s
+kuadrant-controller-manager             1/1     1            1           4m50s
+kuadrant-gateway                        1/1     1            1           4m51s
+limitador                               1/1     1            1           3m58s
+limitador-operator-controller-manager   1/1     1            1           4m51s
 ```
 
-### Service discovery: OAS or MatchPath
+## User Guides
 
-Kuadrant will protect the annotated service either by the OpenAPI spec or the MatchPath spec. 
+### [Basic setup for your service](doc/basic-setup.md)
 
-* If `discovery.kuadrant.io/oas-configmap` annotation is found, the *matchpath* mechanism will be disabled and the *matchpath* annotations will be **ignored** by kuadrant controller.
-* If `discovery.kuadrant.io/matchpath` is not found, the assigned value will be `/`.
-* If `discovery.kuadrant.io/matchpath-type` is not found, the assigned type will be `Prefix`.
+### Create Kuadrant API objects from your services
+OpenAPI vs MatchPath
+OpenAPI in config map vs OpenAPI served at `/openapi`
+SErvice discovery
+kuadrantctl api apply
+
+### Add AuthN for your service
+
+### Add rate limit for your service
 
 ## Contributing
-The [Development guide](doc/development.md) describes how to build the kuadrant controller and how to test your changes before submitting a patch or opening a PR.
+
+The [Development guide](doc/development.md) describes how to build the kuadrant controller and
+how to test your changes before submitting a patch or opening a PR.
 
 ## Licensing
 
