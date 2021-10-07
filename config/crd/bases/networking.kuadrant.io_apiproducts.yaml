@@ -126,14 +126,11 @@ spec:
                 type: object
               routing:
                 properties:
-                  expose:
-                    type: boolean
                   hosts:
                     items:
                       type: string
                     type: array
                 required:
-                - expose
                 - hosts
                 type: object
               securityScheme:

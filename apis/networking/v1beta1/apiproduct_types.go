@@ -62,8 +62,7 @@ type ProductInformation struct {
 }
 
 type Routing struct {
-	Hosts  []string `json:"hosts"`
-	Expose bool     `json:"expose"`
+	Hosts []string `json:"hosts"`
 }
 
 type Mapping struct {

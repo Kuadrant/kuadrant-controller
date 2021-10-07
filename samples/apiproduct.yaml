@@ -9,7 +9,6 @@ spec:
   routing:
     hosts:
       - api.animaltoys.127.0.0.1.nip.io
-    expose: true
   APIs:
     - name: dogs
       namespace: default
