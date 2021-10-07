@@ -71,6 +71,11 @@ func buildAuthConfig(apip *networkingv1beta1.APIProduct) *authorino.AuthConfig {
 		},
 	}
 
+	if !apip.HasSecurity() {
+		common.TagObjectToDelete(authConfig)
+		return authConfig
+	}
+
 	for _, securityScheme := range apip.Spec.SecurityScheme {
 		identity := authorino.Identity{
 			Name:           securityScheme.Name,
