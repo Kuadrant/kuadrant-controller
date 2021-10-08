@@ -4,6 +4,14 @@ This guide lets you quickly integrate kuadrant with your service with the minima
 
 ## Table of contents
 
+* [Steps](#steps)
+   * [Install kuadrant](#install-kuadrant)
+   * [Deploy the upstream Toy Store API service](#deploy-the-upstream-toy-store-api-service)
+   * [Create kuadrant API object](#create-kuadrant-api-object)
+   * [Create kuadrant API Product object](#create-kuadrant-api-product-object)
+   * [Test the Toy Store API](#test-the-toy-store-api)
+   * [Next steps](#next-steps)
+
 TODO
 
 ## Steps
@@ -25,7 +33,7 @@ The Toy Store API Service will be backed by a simple Echo API service.
 Verify that the Toy Store pod is up and running.
 
 ```bash
-❯ kubectl get pods --field-selector=status.phase==Running
+❯ kubectl get pods -n default --field-selector=status.phase==Running
 NAME                        READY   STATUS    RESTARTS   AGE
 toystore-XXXXXXXXXX-XXXXX   1/1     Running   0          2m56s
 ```
@@ -90,13 +98,65 @@ apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
 metadata:
   name: toystore
+  namespace: default
 spec:
-  routing:
-    hosts:
-      - '*'
+  hosts:
+    - '*'
   APIs:
     - name: toystore
       namespace: default
 ```
 
-### Verify the kuadrant service
+Verify the APIProduct ready condition status is `true`
+
+```bash
+❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
+{
+  "conditions": [
+    {
+      "message": "Ready",
+      "reason": "Ready",
+      "status": "True",
+      "type": "Ready"
+    }
+  ],
+  "observedgen": 1
+}
+```
+
+### Test the Toy Store API
+
+Run kubectl port-forward in a different shell:
+
+```bash
+❯ kubectl port-forward -n kuadrant-system service/kuadrant-gateway 9080:80
+Forwarding from [::1]:9080 -> 8080
+```
+
+The service be can now accessed at http://localhost:9080 via a browser or any other client, like curl.
+
+```bash
+❯ curl localhost:9080/toys
+{
+  "method": "GET",
+  "path": "/toys",
+  "query_string": null,
+  "body": "",
+  "headers": {
+    "HTTP_HOST": "localhost:9080",
+    "HTTP_USER_AGENT": "curl/7.68.0",
+    "HTTP_ACCEPT": "*/*",
+    "HTTP_X_FORWARDED_FOR": "10.244.0.1",
+    "HTTP_X_FORWARDED_PROTO": "http",
+    "HTTP_X_ENVOY_INTERNAL": "true",
+    ...
+    "HTTP_X_B3_SAMPLED": "0",
+    "HTTP_VERSION": "HTTP/1.1"
+  },
+  "uuid": "366b1500-0110-4770-a883-9eac384d5f3a"
+}
+```
+
+### Next steps
+
+Check out other [user guides](/README.md#user-guides) for other kuadrant capabilities like AuthN or rate limit.
