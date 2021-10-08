@@ -53,7 +53,7 @@ It needs to be created for each service that is wanted to be protected by kuadra
 
 There are two methods to make it easy for you to create kuadrant API objects:
 * [kuadrantctl CLI](https://github.com/Kuadrant/kuadrantctl/blob/main/doc/api-apply.md) tool with the following command `kuadrantctl api apply --service-name <SERVICE>`
-* The [kuadrant service discovery](managing-apis.md#service-discovery) system watches for services labeled with kuadrant
+* The [kuadrant service discovery](service-discovery.md) system watches for services labeled with kuadrant
 
 For this user guide, we will be using the [kuadrant service discovery](managing-apis.md#service-discovery).
 To activate it, the upstream Toy Store API service needs to be labeled.

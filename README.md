@@ -81,7 +81,7 @@ The install command will create a namespace called `kuadrant-system` and deploy 
 kuadrantctl install
 ```
 
-On successfull command return, you should see the following deployments and pods created.
+On successful command return, you should see the following deployments and pods created.
 
 ```bash
 ❯ k get pods -n kuadrant-system
@@ -104,15 +104,17 @@ limitador                               1/1     1            1           3m58s
 limitador-operator-controller-manager   1/1     1            1           4m51s
 ```
 
+## [Kuadrant service discovery](doc/service-discovery.md)
+
 ## User Guides
 
 ### [Basic setup for your service](doc/basic-setup.md)
 
-### Create Kuadrant API objects from your services
-OpenAPI vs MatchPath
-OpenAPI in config map vs OpenAPI served at `/openapi`
-SErvice discovery
-kuadrantctl api apply
+### [Setup HTTP routing rules from OpenAPI stored in a configmap](doc/service-discovery-oas-configmap.md)
+
+### [Setup HTTP routing rules from OpenAPI served by the service](doc/service-discovery-oas-service.md)
+
+### [Setup HTTP routing rules with matching rules](doc/service-discovery-matching-rules.md)
 
 ### Add AuthN for your service
 
