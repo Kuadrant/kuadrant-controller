@@ -7,7 +7,7 @@
    * [HTTP routing rules from the OpenAPI Spec](#http-routing-rules-from-the-openapi-spec)
    * [HTTP routing rules from custom matchers](#http-routing-rules-from-custom-matchers)
 * [Service Discovery Annotations](#service-discovery-annotations)
-* [Service Discovery Labels:](#service-discovery-labels)
+* [Service Discovery Labels](#service-discovery-labels)
 * [An alternative way to the kuadrant service discovery](#an-alternative-way-to-the-kuadrant-service-discovery)
 
 ## Overview
@@ -57,6 +57,8 @@ is required.
 The Kuadrant Service Discovery will read the OAS document, parse it and configure one HTTP routing
 rule per each [OAS operation](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.2.md#operationObject)
 found in the document.
+
+*Note*: If the OpenAPI has a non empty `servers` array, the *first* object will be used to rewrite the authority (`Host` header).
 
 There are two ways to expose the OpenAPI document to be read by the Kuadrant Service Discovery.
 
@@ -151,8 +153,8 @@ Follow this step-by-step [guide](service-discovery-matching-rules.md) to see thi
 - **discovery.kuadrant.io/oas-path**: *OPTIONAL* Define a specific path for retrieving the config from the service itself.
 - **discovery.kuadrant.io/oas-name-port**: *OPTIONAL* The port to be used to retrieve the OAS config, if not defined, it will used the first one
 
-## Service Discovery Labels:
-- **discovery.kuadrant.io/enabled:**: *REQUIRED* true or false, marks the object to be discovered by kuadrant.
+## Service Discovery Labels
+- **discovery.kuadrant.io/enabled**: *REQUIRED* true or false, marks the object to be discovered by kuadrant.
 
 ## An alternative way to the kuadrant service discovery
 

@@ -49,66 +49,11 @@ The kuadrant controller acts on the following [CRDs](https://kubernetes.io/docs/
 * [API](apis/networking/v1beta1/api_types.go): defines the kuadrant association to a kubernetes service object being the entry point of the API protected.
 * [APIProduct](apis/networking/v1beta1/apiproduct_types.go): defines a desired API Product configuration for a set of kuadrant APIs.
 
-## Getting Started
-
-This guide lets you quickly evaluate Kuadrant.
-
-### Requirements
-
-* Having a [Kubernetes](https://kubernetes.io/) (1.19, 1.20, 1.21, 1.22) cluster up and running.
-* Permission from the Kubernetes cluster to create Custom Resource Definitions (CRDs) during kuadrant's installation. Cluster administrators can handle this requirement through the Kubernetes API Role-Based Access Control bindings.
-* A deployed [kubernetes service](https://kubernetes.io/docs/concepts/services-networking/service/) in the cluster acting as the entry point for your API.
-* Golang 1.16 environment. Download and install steps [here](https://golang.org/doc/install)
-
-**NOTE**: You can easily have a local cluster setup using [Kind](https://kind.sigs.k8s.io/). In this case, the requirement is to have [Docker](https://docker.com/).
-
-### Download kuadrantctl tool
-
-[`kuadrantctl`](https://github.com/Kuadrant/kuadrantctl) is the kuadrant configuration command line utility.
-Currently `kuadrantctl install` command is the recommended installation method of kuadrant.
-
-Download the latest release
-
-```bash
-go install github.com/kuadrant/kuadrantctl@latest
-```
-
-### Install kuadrant
-
-The install command will create a namespace called `kuadrant-system` and deploy kuadrant services in that namespace.
-
-```bash
-kuadrantctl install
-```
-
-On successful command return, you should see the following deployments and pods created.
-
-```bash
-❯ k get pods -n kuadrant-system
-NAME                                                     READY   STATUS    RESTARTS   AGE
-authorino-controller-manager-XXXXXXXXXXX-XXXX            2/2     Running   0          3m6s
-istiod-XXXXXXXXXX-XXXXX                                  1/1     Running   0          3m11s
-kuadrant-controller-manager-XXXXXXXXXX-XXXX              2/2     Running   0          3m5s
-kuadrant-gateway-XXXXXXXXXX-XXXX                         1/1     Running   0          3m5s
-limitador-XXXXXXXXXX-XXXXX                               1/1     Running   0          2m13s
-limitador-operator-controller-manager-XXXXXXXXXX-XXXXX   2/2     Running   0          3m6s
-
-
-❯ k get deployments -n kuadrant-system
-NAME                                    READY   UP-TO-DATE   AVAILABLE   AGE
-authorino-controller-manager            1/1     1            1           4m51s
-istiod                                  1/1     1            1           4m57s
-kuadrant-controller-manager             1/1     1            1           4m50s
-kuadrant-gateway                        1/1     1            1           4m51s
-limitador                               1/1     1            1           3m58s
-limitador-operator-controller-manager   1/1     1            1           4m51s
-```
+## [Getting started](doc/getting-started.md)
 
 ## [Kuadrant service discovery](doc/service-discovery.md)
 
 ## User Guides
-
-### [Basic setup for your service](doc/basic-setup.md)
 
 ### [Setup HTTP routing rules from OpenAPI stored in a configmap](doc/service-discovery-oas-configmap.md)
 
@@ -116,7 +61,9 @@ limitador-operator-controller-manager   1/1     1            1           4m51s
 
 ### [Setup HTTP routing rules with matching rules](doc/service-discovery-matching-rules.md)
 
-### Add AuthN for your service
+### Add AuthN based on API key for your service
+
+### Add AuthN based on OpenID Connect for your service
 
 ### Add rate limit for your service
 

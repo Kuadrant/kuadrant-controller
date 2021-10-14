@@ -1,10 +1,13 @@
-# Basic setup
+# Getting Started
 
-This guide lets you quickly integrate kuadrant with your service with the minimal configuration needed.
+This guide lets you quickly evaluate Kuadrant.
+Follow the steps to integrate kuadrant with your service with the minimal configuration needed.
 
 ## Table of contents
 
+* [Requirements](#requirements)
 * [Steps](#steps)
+   * [Download kuadrantctl tool](#download-kuadrantctl-tool)
    * [Install kuadrant](#install-kuadrant)
    * [Deploy the upstream Toy Store API service](#deploy-the-upstream-toy-store-api-service)
    * [Create kuadrant API object](#create-kuadrant-api-object)
@@ -12,13 +15,58 @@ This guide lets you quickly integrate kuadrant with your service with the minima
    * [Test the Toy Store API](#test-the-toy-store-api)
    * [Next steps](#next-steps)
 
-TODO
+## Requirements
+
+* Having a [Kubernetes](https://kubernetes.io/) (1.19, 1.20, 1.21, 1.22) cluster up and running.
+* Permission from the Kubernetes cluster to create Custom Resource Definitions (CRDs) during kuadrant's installation. Cluster administrators can handle this requirement through the Kubernetes API Role-Based Access Control bindings.
+* A deployed [kubernetes service](https://kubernetes.io/docs/concepts/services-networking/service/) in the cluster acting as the entry point for your API.
+* Golang 1.16 environment. Download and install steps [here](https://golang.org/doc/install)
+
+**NOTE**: You can easily have a local cluster setup using [Kind](https://kind.sigs.k8s.io/). In this case, the requirement is to have [Docker](https://docker.com/).
 
 ## Steps
 
+### Download kuadrantctl tool
+
+[`kuadrantctl`](https://github.com/Kuadrant/kuadrantctl) is the kuadrant configuration command line utility.
+Currently `kuadrantctl install` command is the recommended installation method of kuadrant.
+
+Download the latest release
+
+```bash
+go install github.com/kuadrant/kuadrantctl@latest
+```
+
 ### Install kuadrant
 
-Follow [kuadrant installation steps](/README.md#getting-started) to have kuadrant up and running.
+The install command will create a namespace called `kuadrant-system` and deploy kuadrant services in that namespace.
+
+```bash
+kuadrantctl install
+```
+
+On successful command return, you should see the following deployments and pods created.
+
+```bash
+❯ k get pods -n kuadrant-system
+NAME                                                     READY   STATUS    RESTARTS   AGE
+authorino-controller-manager-XXXXXXXXXXX-XXXX            2/2     Running   0          3m6s
+istiod-XXXXXXXXXX-XXXXX                                  1/1     Running   0          3m11s
+kuadrant-controller-manager-XXXXXXXXXX-XXXX              2/2     Running   0          3m5s
+kuadrant-gateway-XXXXXXXXXX-XXXX                         1/1     Running   0          3m5s
+limitador-XXXXXXXXXX-XXXXX                               1/1     Running   0          2m13s
+limitador-operator-controller-manager-XXXXXXXXXX-XXXXX   2/2     Running   0          3m6s
+
+
+❯ k get deployments -n kuadrant-system
+NAME                                    READY   UP-TO-DATE   AVAILABLE   AGE
+authorino-controller-manager            1/1     1            1           4m51s
+istiod                                  1/1     1            1           4m57s
+kuadrant-controller-manager             1/1     1            1           4m50s
+kuadrant-gateway                        1/1     1            1           4m51s
+limitador                               1/1     1            1           3m58s
+limitador-operator-controller-manager   1/1     1            1           4m51s
+```
 
 ### Deploy the upstream Toy Store API service
 
@@ -133,7 +181,7 @@ Run kubectl port-forward in a different shell:
 Forwarding from [::1]:9080 -> 8080
 ```
 
-The service be can now accessed at http://localhost:9080 via a browser or any other client, like curl.
+The service be can now accessed at `http://localhost:9080` via a browser or any other client, like curl.
 
 ```bash
 ❯ curl localhost:9080/toys
