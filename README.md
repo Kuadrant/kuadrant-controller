@@ -19,7 +19,7 @@ Furthermore it only strives to provide what Kubernetes doesn’t offer out of th
 instead it will opt to connect with what’s there and what’s being developed (think Envoy, GatewayAPI).
 
 Kuadrant is a system of cloud-native k8s components that grows as users’ needs grow.
-* From simple protection of a Service (via AuthN) that is used by teammates working on the same cluster, or “sibling” services, up to Auth of users using OIDC plus custom policies.
+* From simple protection of a Service (via **AuthN**) that is used by teammates working on the same cluster, or “sibling” services, up to **AuthN** of users using OIDC plus custom policies.
 * From no rate-limiting to rate-limiting for global service protection on to rate-limiting by users/plans
 
 towards a full system that is more analogous to current API Management systems where business rules
@@ -49,9 +49,25 @@ The kuadrant controller acts on the following [CRDs](https://kubernetes.io/docs/
 * [API](apis/networking/v1beta1/api_types.go): defines the kuadrant association to a kubernetes service object being the entry point of the API protected.
 * [APIProduct](apis/networking/v1beta1/apiproduct_types.go): defines a desired API Product configuration for a set of kuadrant APIs.
 
+## List of features
+
+| Feature | Description | Stage |
+| --- | --- | --- |
+| [OpenAPI 3.x](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.2.md) | OpenAPI driven configuration. The document can be read from a configmap or served from the upstream API service | *Ready* |
+| *Path Match* based routing | HTTP routing rules will be configured based on request path expressions. Accepted values are `Exact`, `Prefix` and `RegularExpression` | *Ready* |
+| [Service Discovery](doc/service-discovery.md) | kubernetes [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) and [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) for a seamless integration | *Ready* |
+| **AuthN** based on API key | Protect your service with a simple API key based authentication mechanism | *Ready* |
+| **AuthN** based on [OpenID Connect (OIDC)](https://openid.net/connect/) | Kuadrant can verify OIDC (JWTs) tokens to authenticate users | *Ready* |
+| Global Rate Limiting | Single global rate limit for all requests. Main use case for protecting infrastructure resources | *Ready* |
+| Rate Limiting Per Remote IP | Rate limit configuration per each remote IP address. Main use case for protecting infrastructure resources | *Ready* |
+| Authenticated Rate Limiting | Rate limit configuration per each authenticated client | *Ready* |
+| Server TLS | TLS termination for downstream connections | Planned |
+| Upstream TLS | Client certificates upstream connections | Planned |
+| mTLS | Mutual TLS termination for downstream connections | Planned |
+
 ## [Getting started](doc/getting-started.md)
 
-## [Kuadrant service discovery](doc/service-discovery.md)
+## [Service discovery](doc/service-discovery.md)
 
 ## User Guides
 

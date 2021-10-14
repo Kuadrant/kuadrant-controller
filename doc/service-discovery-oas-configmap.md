@@ -48,7 +48,14 @@ configmap/toystore created
 
 ## Activate the service discovery
 
-In order to activate the service discovery, we need to add an annotation to the Toy Store service.
+In order to activate the service discovery, the upstream Toy Store API service needs to be labeled.
+
+```bash
+❯ kubectl -n default label service toystore discovery.kuadrant.io/enabled=true
+service/toystore labeled
+```
+
+We need to add an annotation to the Toy Store service.
 The annotation will have a reference to the recently created config map.
 
 ```bash
@@ -56,7 +63,7 @@ The annotation will have a reference to the recently created config map.
 service/toystore annotated
 ```
 
-Verify that the Toy Store kuadrant API object has been updated with the OpenAPI document.
+Verify that the Toy Store kuadrant API object has been created with the OpenAPI document.
 
 ```bash
 ❯ kubectl -n default get api toystore -o yaml
@@ -87,6 +94,49 @@ spec:
             responses:
               405:
                 description: "invalid input"
+```
+
+### Create kuadrant API Product object
+
+The kuadrant API Product custom resource represents the kuadrant protection configuration for your service.
+For this user guide, we will be creating the minimum configuration required to integrate kuadrant with your service.
+
+```yaml
+❯ cat apiproduct.yaml
+---
+apiVersion: networking.kuadrant.io/v1beta1
+kind: APIProduct
+metadata:
+  name: toystore
+  namespace: default
+spec:
+  hosts:
+    - '*'
+  APIs:
+    - name: toystore
+      namespace: default
+```
+
+```bash
+❯ kubectl -n default apply -f apiproduct.yaml
+apiproduct.networking.kuadrant.io/toystore created
+```
+
+Verify the APIProduct ready condition status is `true`
+
+```bash
+❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
+{
+  "conditions": [
+    {
+      "message": "Ready",
+      "reason": "Ready",
+      "status": "True",
+      "type": "Ready"
+    }
+  ],
+  "observedgen": 1
+}
 ```
 
 ## Test the Toy Store API

@@ -5,7 +5,7 @@
 * [Overview](#overview)
 * [HTTP Routing Rules](#http-routing-rules)
    * [HTTP routing rules from the OpenAPI Spec](#http-routing-rules-from-the-openapi-spec)
-   * [HTTP routing rules from custom matchers](#http-routing-rules-from-custom-matchers)
+   * [HTTP routing rules from request path matchers](#http-routing-rules-from-request-path-matchers)
 * [Service Discovery Annotations](#service-discovery-annotations)
 * [Service Discovery Labels](#service-discovery-labels)
 * [An alternative way to the kuadrant service discovery](#an-alternative-way-to-the-kuadrant-service-discovery)
@@ -19,7 +19,7 @@ for new services and creates kuadrant API objects automatically.
 
 When adding a new application that contains an API, to reduce the number of objects that a user has to author,
 Kuadrant can leverage kubernetes [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
-and [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) for a smoothless integration.
+and [labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) for a seamless integration.
 A good place to annotate is the kubernetes service used to drive traffic to the user's API.
 
 To make your application service "visible" for the Kuadrant Service Discovery system,
@@ -47,7 +47,7 @@ be watching for some specific kubernetes service
 Basically there are two mechanisms to declare the routing rules:
 
 * [OpenAPI Specification (OAS) 3.x](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.2.md)
-* Custom HTTP request matchers
+* Path match based routing
 
 ### HTTP routing rules from the OpenAPI Spec
 
@@ -104,7 +104,7 @@ metadata:
 
 Follow this step-by-step [guide](service-discovery-oas-service.md) to see this method in action.
 
-### HTTP routing rules from custom matchers
+### HTTP routing rules from request path matchers
 
 The Kuadrant Service Discovery will use the following annotations to configure HTTP routing rules.
 
