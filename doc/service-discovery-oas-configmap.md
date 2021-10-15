@@ -1,4 +1,4 @@
-# Setup HTTP routing rules from OpenAPI stored in a configmap
+# HTTP routing rules from OpenAPI stored in a configmap
 
 This guide shows how to define the routing rules
 from the [OpenAPI Specification (OAS) 3.x](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.2.md)

@@ -64,6 +64,8 @@ The kuadrant controller acts on the following [CRDs](https://kubernetes.io/docs/
 | Server TLS | TLS termination for downstream connections | Planned |
 | Upstream TLS | Client certificates upstream connections | Planned |
 | mTLS | Mutual TLS termination for downstream connections | Planned |
+| [Gateway API](https://gateway-api.sigs.k8s.io/) | Implementation of kuadrant features on top of the Gateway API | Planned |
+| Monitoring and Alerting | Observability based on [Grafana](https://grafana.com/) and [Prometheus](https://prometheus.io/) | Planned |
 
 ## [Getting started](doc/getting-started.md)
 
@@ -71,17 +73,17 @@ The kuadrant controller acts on the following [CRDs](https://kubernetes.io/docs/
 
 ## User Guides
 
-### [Setup HTTP routing rules from OpenAPI stored in a configmap](doc/service-discovery-oas-configmap.md)
+### [HTTP routing rules from OpenAPI stored in a configmap](doc/service-discovery-oas-configmap.md)
 
-### [Setup HTTP routing rules from OpenAPI served by the service](doc/service-discovery-oas-service.md)
+### [HTTP routing rules from OpenAPI served by the service](doc/service-discovery-oas-service.md)
 
-### [Setup HTTP routing rules with path matching](doc/service-discovery-path-match.md)
+### [HTTP routing rules with path matching](doc/service-discovery-path-match.md)
 
-### Add AuthN based on API key for your service
+### [AuthN based on API key](doc/authn-api-key.md)
 
-### Add AuthN based on OpenID Connect for your service
+### [AuthN based on OpenID Connect]
 
-### Add rate limit for your service
+### [Rate limit for your service]
 
 ## Contributing
 

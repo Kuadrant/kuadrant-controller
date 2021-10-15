@@ -1,4 +1,4 @@
-# Setup HTTP routing rules from OpenAPI served by the service
+# HTTP routing rules from OpenAPI served by the service
 
 This guide shows how to define the routing rules
 from the [OpenAPI Specification (OAS) 3.x](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.2.md)

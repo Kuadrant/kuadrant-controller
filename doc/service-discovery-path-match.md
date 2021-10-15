@@ -1,10 +1,14 @@
-# Setup HTTP routing rules with path matching
+# HTTP routing rules with path matching
 
 This guide shows how to define the routing rules based on path matching expressions.
 
 ## Table of contents
 
-TODO
+* [Preparation](#preparation)
+* [Activate the service discovery](#activate-the-service-discovery)
+* [Create kuadrant API Product object](#create-kuadrant-api-product-object)
+* [Test the Toy Store API](#test-the-toy-store-api)
+* [Next steps](#next-steps)
 
 ## Preparation
 
