@@ -75,7 +75,7 @@ The kuadrant controller acts on the following [CRDs](https://kubernetes.io/docs/
 
 ### [Setup HTTP routing rules from OpenAPI served by the service](doc/service-discovery-oas-service.md)
 
-### [Setup HTTP routing rules with matching rules](doc/service-discovery-matching-rules.md)
+### [Setup HTTP routing rules with path matching](doc/service-discovery-path-match.md)
 
 ### Add AuthN based on API key for your service
 
