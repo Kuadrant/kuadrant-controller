@@ -153,9 +153,9 @@ spec:
 
 ### [AuthN based on API key](doc/authn-api-key.md)
 
-### [AuthN based on OpenID Connect]
+### [AuthN based on OpenID Connect](doc/authn-oidc.md)
 
-### [Rate limit for your service]
+### [Rate limit for your service](doc/rate-limit.md)
 
 ## Contributing
 
