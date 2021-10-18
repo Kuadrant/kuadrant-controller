@@ -25,101 +25,18 @@ Kuadrant is a system of cloud-native k8s components that grows as users’ needs
 towards a full system that is more analogous to current API Management systems where business rules
 and plans define protections and Business/User related Analytics are available.
 
-Kuadrant relies on [Istio](https://istio.io/) to operate the
-[istio ingress gateway](https://istio.io/latest/docs/reference/config/networking/gateway/)
-to provide API management with authentication and rate limit capabilities. Kuadrant configures, optionally,
-the integration of the [istio ingress gateway](https://istio.io/latest/docs/reference/config/networking/gateway/)
-with few kuadrant components to provide the aforementioned capabilities.
-
-* The AuthN/AuthZ enforcer [Authorino](https://github.com/Kuadrant/authorino)
-* The rate limit service [Limitador](https://github.com/Kuadrant/limitador) which exposes a [GRPC] service implementing the [Envoy Rate Limit protocol (v3)](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ratelimit/v3/rls.proto).
-
-![Kuadrant overview](doc/kuadrant-overview.svg)
-
-The kuadrant controller is the component reading the customer desired configuration
-(declaratively as kubernetes custom resources) and ensures all components
-are configured to obey customer's desired behavior.
-
 ## CustomResourceDefinitions
 
 A core feature of the kuadrant controller is to monitor the Kubernetes API server for changes to
 specific objects and ensure the owned k8s components configuration match these objects.
 The kuadrant controller acts on the following [CRDs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/):
 
-* [APIProduct](apis/networking/v1beta1/apiproduct_types.go): Customer-facing APIs. APIProduct facilitates the creation of strong and simplified offerings for API consumers.
-* [API](apis/networking/v1beta1/api_types.go): Internal APIs bundled in a product. Kuadrant API objects grant API providers the freedom to map their internal API organization structure to kuadrant.
+| CRD | Description |
+| --- | --- |
+| [APIProduct](apis/networking/v1beta1/apiproduct_types.go) | Customer-facing APIs. APIProduct facilitates the creation of strong and simplified offerings for API consumers |
+| [API](apis/networking/v1beta1/api_types.go) | Internal APIs bundled in a product. Kuadrant API objects grant API providers the freedom to map their internal API organization structure to kuadrant |
 
-An API Product can contain multiple APIs, and an API can be used in multiple API Products. In other words, to integrate and manage your API in kuadrant you need to create both:
-
-* A kuadrant API CR containing at least the reference to the kuberntes service of your API.
-* A kuadrant API Product CR for which you define the used APIs in addition to protection features like authN and rate limiting.
-
-The following diagram illustrates the relationship between the CRDs with a simple example involving two API Products and two APIs.
-
-![Kuadrant CRD](doc/kuadrant-crd.svg)
-
-### API Product CRD
-
-An API Product custom resource looks like this:
-
-```yaml
----
-apiVersion: networking.kuadrant.io/v1beta1
-kind: APIProduct
-metadata:
-  name: animaltoys
-spec:
-  hosts:
-    - api.animaltoys.io
-  APIs:
-    - name: dogs
-      namespace: default
-    - name: cats
-      namespace: default
-  securityScheme:
-    - name: MyAPIKey
-      apiKeyAuth:
-        location: authorization_header
-        name: APIKEY
-        credential_source:
-          labelSelectors:
-            secret.kuadrant.io/managed-by: authorino
-            api: animaltoys
-  rateLimit:
-    global:
-      maxValue: 100
-      period: 30
-    perRemoteIP:
-      maxValue: 10
-      period: 30
-    authenticated:
-      maxValue: 5
-      period: 30
-```
-
-### API CRD
-
-An API custom resource looks like this:
-
-```yaml
----
-apiVersion: networking.kuadrant.io/v1beta1
-kind: API
-metadata:
-  name: toystore
-  namespace: default
-spec:
-  destination:
-    schema: http
-    serviceReference:
-      name: toystore
-      namespace: default
-      port: 80
-  mappings:
-    HTTPPathMatch:
-      type: Prefix
-      value: /
-```
+For a detailed description of the CRDs above, refer to the [Architecture](doc/architecture.md) page.
 
 ## List of features
 
@@ -139,9 +56,13 @@ spec:
 | [Gateway API](https://gateway-api.sigs.k8s.io/) | Implementation of kuadrant features on top of the Gateway API | Planned |
 | Monitoring and Alerting | Observability based on [Grafana](https://grafana.com/) and [Prometheus](https://prometheus.io/) | Planned |
 
-## [Getting started](doc/getting-started.md)
+For a detailed description of the features above, refer to the [Architecture](doc/architecture.md) page.
 
-## [Service discovery](doc/service-discovery.md)
+## Architecture
+
+The [Architecture](doc/architecture.md) section of the docs covers the details of protecting your APIs with Kuadrant.
+
+## [Getting started](doc/getting-started.md)
 
 ## User Guides
 
@@ -155,7 +76,7 @@ spec:
 
 ### [AuthN based on OpenID Connect](doc/authn-oidc.md)
 
-### [Rate limit for your service](doc/rate-limit.md)
+### [Rate limiting](doc/rate-limit.md)
 
 ## Contributing
 
