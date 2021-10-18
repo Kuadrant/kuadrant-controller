@@ -46,8 +46,80 @@ A core feature of the kuadrant controller is to monitor the Kubernetes API serve
 specific objects and ensure the owned k8s components configuration match these objects.
 The kuadrant controller acts on the following [CRDs](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/):
 
-* [API](apis/networking/v1beta1/api_types.go): defines the kuadrant association to a kubernetes service object being the entry point of the API protected.
-* [APIProduct](apis/networking/v1beta1/apiproduct_types.go): defines a desired API Product configuration for a set of kuadrant APIs.
+* [APIProduct](apis/networking/v1beta1/apiproduct_types.go): Customer-facing APIs. APIProduct facilitates the creation of strong and simplified offerings for API consumers.
+* [API](apis/networking/v1beta1/api_types.go): Internal APIs bundled in a product. Kuadrant API objects grant API providers the freedom to map their internal API organization structure to kuadrant.
+
+An API Product can contain multiple APIs, and an API can be used in multiple API Products. In other words, to integrate and manage your API in kuadrant you need to create both:
+
+* A kuadrant API CR containing at least the reference to the kuberntes service of your API.
+* A kuadrant API Product CR for which you define the used APIs in addition to protection features like authN and rate limiting.
+
+The following diagram illustrates the relationship between the CRDs with a simple example involving two API Products and two APIs.
+
+![Kuadrant CRD](doc/kuadrant-crd.svg)
+
+### API Product CRD
+
+An API Product custom resource looks like this:
+
+```yaml
+---
+apiVersion: networking.kuadrant.io/v1beta1
+kind: APIProduct
+metadata:
+  name: animaltoys
+spec:
+  hosts:
+    - api.animaltoys.io
+  APIs:
+    - name: dogs
+      namespace: default
+    - name: cats
+      namespace: default
+  securityScheme:
+    - name: MyAPIKey
+      apiKeyAuth:
+        location: authorization_header
+        name: APIKEY
+        credential_source:
+          labelSelectors:
+            secret.kuadrant.io/managed-by: authorino
+            api: animaltoys
+  rateLimit:
+    global:
+      maxValue: 100
+      period: 30
+    perRemoteIP:
+      maxValue: 10
+      period: 30
+    authenticated:
+      maxValue: 5
+      period: 30
+```
+
+### API CRD
+
+An API custom resource looks like this:
+
+```yaml
+---
+apiVersion: networking.kuadrant.io/v1beta1
+kind: API
+metadata:
+  name: toystore
+  namespace: default
+spec:
+  destination:
+    schema: http
+    serviceReference:
+      name: toystore
+      namespace: default
+      port: 80
+  mappings:
+    HTTPPathMatch:
+      type: Prefix
+      value: /
+```
 
 ## List of features
 

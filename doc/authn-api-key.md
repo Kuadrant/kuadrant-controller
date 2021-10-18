@@ -8,7 +8,11 @@ resource that contains an `api_key` entry and kuadrant labels for future referen
 
 ## Table of contents
 
-TODO
+* [Preparation](#preparation)
+* [Create one secret with the API key](#create-one-secret-with-the-api-key)
+* [Create kuadrant API Product object](#create-kuadrant-api-product-object)
+* [Test the Toy Store API](#test-the-toy-store-api)
+* [Next steps](#next-steps)
 
 ## Preparation
 
