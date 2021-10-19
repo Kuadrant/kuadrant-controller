@@ -21,6 +21,8 @@ Follow the steps to integrate kuadrant with your service with the minimal config
 * Permission from the Kubernetes cluster to create Custom Resource Definitions (CRDs) during kuadrant's installation. Cluster administrators can handle this requirement through the Kubernetes API Role-Based Access Control bindings.
 * A deployed [kubernetes service](https://kubernetes.io/docs/concepts/services-networking/service/) in the cluster acting as the entry point for your API.
 * Golang 1.16 environment. Download and install steps [here](https://golang.org/doc/install)
+* Installed [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl) >= 1.19
+* Installed [`jq`](https://stedolan.github.io/jq/download/) >= 1.5 utility to parse JSON objects
 
 **NOTE**: You can easily have a local cluster setup using [Kind](https://kind.sigs.k8s.io/). In this case, the requirement is to have [Docker](https://docker.com/).
 

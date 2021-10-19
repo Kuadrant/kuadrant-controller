@@ -52,10 +52,10 @@ An API Product custom resource looks like this:
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
 metadata:
-  name: animaltoys
+  name: toystore
 spec:
   hosts:
-    - api.animaltoys.io
+    - api.toystore.io
   APIs:
     - name: dogs
       namespace: default
@@ -69,7 +69,7 @@ spec:
         credential_source:
           labelSelectors:
             secret.kuadrant.io/managed-by: authorino
-            api: animaltoys
+            api: toystore
   rateLimit:
     global:
       maxValue: 100
@@ -92,17 +92,17 @@ a **prefix** path can be added to a given API reference. For example:
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
 metadata:
-  name: animaltoys
+  name: toystore
 spec:
   hosts:
-    - api.animaltoys.io
+    - api.toystore.io
   APIs:
     - name: dogs
       namespace: default
       prefix: /dogs
 ```
 
-Kuadrant will expose publickly `dogs` API with a prefix of `/dogs`.
+Kuadrant will expose the API referenced by `dogs` with a prefix of `/dogs`.
 The upstream request will not have the added prefix to match upstream API.
 
 ### API CRD
@@ -180,6 +180,36 @@ type: Opaque
 
 Follow the [AuthN based on API key](authn-api-key.md) user guide to see that working.
 
+**User Identification**
+
+Optionally, the API key can be associated to a named user id or user name.
+It is used for security based on authenticated requests,
+like [authenticated rate limit](#authenticated-rate-limiting).
+
+The association is done adding a custom kuadrant annotation
+
+```
+secret.kuadrant.io/user-id: <USERNAME>
+```
+
+To follow up with the previous example:
+
+```yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-1-api-key-1
+  annotations:
+    secret.kuadrant.io/user-id: user-1
+  labels:
+    secret.kuadrant.io/managed-by: authorino
+    api: toystore
+stringData:
+  api_key: <some-randomly-generated-api-key-value>
+type: Opaque
+```
+
 ### OpenID Connect
 
 Kuadrant automatically discovers OpenID Connect configurations for the configured issuers
@@ -205,6 +235,13 @@ Kuadrant would accept any valid ID token (JWT) by verifying the signature and ti
 
 Follow the [AuthN based on OpenID Connect](authn-oidc.md) user guide to see that working.
 
+**User Identification**
+
+The user identification from the received token is done reading the well known field `sub`
+(subject) of the ID token in JWT format.
+It is used for security based on authenticated requests,
+like [authenticated rate limit](#authenticated-rate-limiting).
+
 ## Rate Limiting
 
 Kuadrant offers some basic rate limiting modes:
@@ -214,7 +251,6 @@ Kuadrant offers some basic rate limiting modes:
 
 The controller supports activation of any type of rate limit individually or any combination of them as well.
 Even all of them at the same time.
-
 
 ### Global Rate limiting
 
@@ -229,7 +265,7 @@ The following example will set global rate limit for 100 request for a period of
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
 metadata:
-  name: animaltoys
+  name: toystore
 spec:
   rateLimit:
     global:
@@ -249,7 +285,7 @@ The following example will set rate limit for 10 request for a period of time of
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
 metadata:
-  name: animaltoys
+  name: toystore
 spec:
   rateLimit:
     perRemoteIP:
@@ -261,7 +297,7 @@ spec:
 
 Rate limit configuration per each authenticated client.
 This type of rate limit cannot be applied to specific clients.
-All authenticated clients get the same rate limit.
+All authenticated clients get the same rate limit configuration.
 
 The following example will set rate limit for 5 request for a period of time of 30 seconds
 for each authenticated client.
@@ -271,7 +307,7 @@ for each authenticated client.
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
 metadata:
-  name: animaltoys
+  name: toystore
 spec:
   rateLimit:
     authenticated:
