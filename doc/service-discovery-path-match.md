@@ -17,13 +17,6 @@ being protected by kuadrant.
 
 ## Activate the service discovery
 
-In order to activate the service discovery, the upstream Toy Store API service needs to be labeled.
-
-```bash
-❯ kubectl -n default label service toystore discovery.kuadrant.io/enabled=true
-service/toystore labeled
-```
-
 We need to add an annotation to the Toy Store service.
 The annotation will have the path matching expression.
 
@@ -34,7 +27,7 @@ service/toystore annotated
 
 Verify that the Toy Store kuadrant API object has been created with the path matching config.
 
-```bash
+```yaml
 ❯ kubectl -n default get api toystore -o yaml
 apiVersion: networking.kuadrant.io/v1beta1
 kind: API
@@ -60,7 +53,7 @@ The kuadrant API Product custom resource represents the kuadrant protection conf
 For this user guide, we will be creating the minimum configuration required to integrate kuadrant with your service.
 
 ```yaml
-❯ cat apiproduct.yaml
+❯ kubectl -n default apply -f - <<EOF
 ---
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
@@ -73,16 +66,12 @@ spec:
   APIs:
     - name: toystore
       namespace: default
-```
-
-```bash
-❯ kubectl -n default apply -f apiproduct.yaml
-apiproduct.networking.kuadrant.io/toystore created
+EOF
 ```
 
 Verify the APIProduct ready condition status is `true`
 
-```bash
+```json
 ❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -135,11 +124,8 @@ As the path match expression allows, requesting `GET /v1/something` should work:
 On the other hand, any other request missing `/v1` path prefix should fail.
 
 ```bash
-❯ curl -I localhost:9080/something
-HTTP/1.1 404 Not Found
-date: Fri, 15 Oct 2021 12:02:04 GMT
-server: istio-envoy
-transfer-encoding: chunked
+❯ curl --write-out '%{http_code}' --silent --output /dev/null localhost:9080/something
+404
 ```
 
 ## Next steps

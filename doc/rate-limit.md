@@ -7,7 +7,11 @@ On the other hand, `alice`'s traffic does not exceed rate limitations and her tr
 
 ## Table of contents
 
-TODO
+* [Preparation](#preparation)
+* [Create API keys](#create-api-keys)
+* [Create kuadrant API Product object](#create-kuadrant-api-product-object)
+* [Test the Toy Store API](#test-the-toy-store-api)
+* [Next steps](#next-steps)
 
 ## Preparation
 

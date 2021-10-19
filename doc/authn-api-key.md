@@ -43,7 +43,7 @@ the secrets having the desired API keys.
 
 
 ```yaml
-❯ cat apiproduct.yaml
+❯ kubectl -n default apply -f - <<EOF
 ---
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
@@ -65,6 +65,7 @@ spec:
           labelSelectors:
             secret.kuadrant.io/managed-by: authorino
             api: toystore
+EOF
 ```
 
 Note that, according to the configuration, the API key is expected be in the authorization header,
@@ -72,15 +73,9 @@ with a key selector `APIKEY` followed by the actual API key.
 
 For a full list of available options, check out the [APIProduct reference](/apis/networking/v1beta1/apiproduct_types.go).
 
-
-```bash
-❯ kubectl -n default apply -f apiproduct.yaml
-apiproduct.networking.kuadrant.io/toystore created
-```
-
 Verify the APIProduct ready condition status is `true`
 
-```bash
+```json
 ❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -109,18 +104,13 @@ The service be can now accessed at `http://localhost:9080` via a browser or any 
 Without any API key, the request should fail with `401 Unauthorized`:
 
 ```bash
-❯ curl -H "Host: toystore.127.0.0.1.nip.io" -I localhost:9080/something
-HTTP/1.1 401 Unauthorized
-www-authenticate: APIKEY realm="MyAPIKey"
-x-ext-auth-reason: credential not found
-date: Fri, 15 Oct 2021 23:15:05 GMT
-server: istio-envoy
-transfer-encoding: chunked
+❯ curl --write-out '%{http_code}' --silent --output /dev/null -H "Host: toystore.127.0.0.1.nip.io" localhost:9080/toy
+401
 ```
 
 On the other hand, adding the API key to the request, the request should reach the Toy Store service.
 
-```bash
+```json
 ❯ curl -H "Host: toystore.127.0.0.1.nip.io" -H "Authorization: APIKEY JUSTFORDEMOSOBVIOUSLY" localhost:9080/something
 {
   "method": "GET",

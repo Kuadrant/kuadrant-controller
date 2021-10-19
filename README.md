@@ -6,7 +6,20 @@
 
 ## Table of contents
 
-TODO
+* [Overview](#overview)
+* [CustomResourceDefinitions](#customresourcedefinitions)
+* [List of features](#list-of-features)
+* [Architecture](#architecture)
+* [<a href="doc/getting-started.md">Getting started</a>](#getting-started)
+* [User Guides](#user-guides)
+   * [<a href="doc/service-discovery-oas-configmap.md">HTTP routing rules from OpenAPI stored in a configmap</a>](#http-routing-rules-from-openapi-stored-in-a-configmap)
+   * [<a href="doc/service-discovery-oas-service.md">HTTP routing rules from OpenAPI served by the service</a>](#http-routing-rules-from-openapi-served-by-the-service)
+   * [<a href="doc/service-discovery-path-match.md">HTTP routing rules with path matching</a>](#http-routing-rules-with-path-matching)
+   * [<a href="doc/authn-api-key.md">AuthN based on API key</a>](#authn-based-on-api-key)
+   * [<a href="doc/authn-oidc.md">AuthN based on OpenID Connect</a>](#authn-based-on-openid-connect)
+   * [<a href="doc/rate-limit.md">Rate limiting</a>](#rate-limiting)
+* [Contributing](#contributing)
+* [Licensing](#licensing)
 
 ## Overview
 

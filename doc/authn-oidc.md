@@ -49,7 +49,7 @@ For this user guide, the minimal API Product custom resource will be extended to
 section with the configuration needed to protect the upstream APIs with OIDC authN.
 
 ```yaml
-❯ cat apiproduct.yaml
+❯ kubectl -n default apply -f - <<EOF
 ---
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
@@ -66,6 +66,7 @@ spec:
     - name: MyOIDCAuth
       openIDConnectAuth:
         url: https://myoidcprovider.example.com/auth/realms/basic
+EOF
 ```
 
 Note that kuadrant does not need OIDC client credentials.
@@ -76,7 +77,7 @@ For a full list of available options, check out the [APIProduct reference](/apis
 
 Verify the APIProduct ready condition status is `true`
 
-```bash
+```json
 ❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -105,18 +106,13 @@ The service be can now accessed at `http://localhost:9080` via a browser or any 
 Without any access token, the request should fail with `401 Unauthorized`:
 
 ```bash
-❯ curl -H "Host: toystore.127.0.0.1.nip.io" -I localhost:9080/something
-HTTP/1.1 401 Unauthorized
-www-authenticate: Bearer realm="MyOIDCAuth"
-x-ext-auth-reason: credential not found
-date: Mon, 18 Oct 2021 14:20:22 GMT
-server: istio-envoy
-transfer-encoding: chunked
+❯ curl --write-out '%{http_code}' --silent --output /dev/null -H "Host: toystore.127.0.0.1.nip.io" localhost:9080/something
+401
 ```
 
 On the other hand, adding the access token to the request, the request should reach the Toy Store service.
 
-```bash
+```json
 ❯ curl -H "Host: toystore.127.0.0.1.nip.io" -H "Authorization: Bearer $ACCESS_TOKEN" localhost:9080/something
 {
   "method": "GET",

@@ -117,7 +117,7 @@ service/toystore labeled
 
 Verify that the Toy Store kuadrant API object has been created.
 
-```bash
+```yaml
 ❯ kubectl -n default get api toystore -o yaml
 apiVersion: networking.kuadrant.io/v1beta1
 kind: API
@@ -145,7 +145,7 @@ The kuadrant API Product custom resource represents the kuadrant protection conf
 For this user guide, we will be creating the minimum configuration required to integrate kuadrant with your service.
 
 ```yaml
-❯ cat apiproduct.yaml
+❯ kubectl -n default apply -f - <<EOF
 ---
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
@@ -158,16 +158,12 @@ spec:
   APIs:
     - name: toystore
       namespace: default
-```
-
-```bash
-❯ kubectl -n default apply -f apiproduct.yaml
-apiproduct.networking.kuadrant.io/toystore created
+EOF
 ```
 
 Verify the APIProduct ready condition status is `true`
 
-```bash
+```json
 ❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [

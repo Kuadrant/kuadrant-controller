@@ -131,7 +131,7 @@ The kuadrant API Product custom resource represents the kuadrant protection conf
 For this user guide, we will be creating the minimum configuration required to integrate kuadrant with your service.
 
 ```yaml
-❯ cat apiproduct.yaml
+❯ kubectl -n default apply -f - <<EOF
 ---
 apiVersion: networking.kuadrant.io/v1beta1
 kind: APIProduct
@@ -144,16 +144,12 @@ spec:
   APIs:
     - name: petstore
       namespace: default
-```
-
-```bash
-❯ kubectl -n default apply -f apiproduct.yaml
-apiproduct.networking.kuadrant.io/petstore
+EOF
 ```
 
 Verify the APIProduct ready condition status is `true`
 
-```bash
+```json
 ❯ kubectl get apiproduct petstore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -189,11 +185,8 @@ As the OpenAPI doc specifies, requesting `GET /pets` should work:
 On the other hand, any other request should be rejected.
 
 ```bash
-❯ curl -I localhost:9080/toy
-HTTP/1.1 404 Not Found
-date: Thu, 14 Oct 2021 16:03:18 GMT
-server: istio-envoy
-transfer-encoding: chunked
+❯ curl --write-out '%{http_code}' --silent --output /dev/null localhost:9080/toy
+404
 ```
 
 ## Next steps
