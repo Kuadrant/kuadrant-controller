@@ -2,7 +2,19 @@
 
 ## Table of contents
 
-TODO
+* [High level](#high-level)
+* [CustomResourceDefinitions](#customresourcedefinitions)
+   * [API Product CRD](#api-product-crd)
+      * [Setting prefix path for a kuadrant API](#setting-prefix-path-for-a-kuadrant-api)
+   * [API CRD](#api-crd)
+* [<a href="service-discovery.md">Service discovery</a>](#service-discovery)
+* [Authentication](#authentication)
+   * [API key](#api-key)
+   * [OpenID Connect](#openid-connect)
+* [Rate Limiting](#rate-limiting)
+   * [Global Rate limiting](#global-rate-limiting)
+   * [Rate Limiting Per Remote IP](#rate-limiting-per-remote-ip)
+   * [Authenticated Rate Limiting](#authenticated-rate-limiting)
 
 ## High level
 
