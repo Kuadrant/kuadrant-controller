@@ -23,7 +23,7 @@ being protected by kuadrant.
 Have the following OpenAPI document in a file called `toystore.yaml`
 
 ```yaml
-❯ cat toystore.yaml
+❯ cat <<'EOF'>> toystore.yaml
 ---
 openapi: "3.0.0"
 info:
@@ -37,6 +37,7 @@ paths:
       responses:
         405:
           description: "invalid input"
+EOF
 ```
 
 Create the config map
@@ -113,7 +114,7 @@ EOF
 
 Verify the APIProduct ready condition status is `true`
 
-```json
+```jsonc
 ❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -137,11 +138,11 @@ Run kubectl port-forward in a different shell:
 Forwarding from [::1]:9080 -> 8080
 ```
 
-The service be can now accessed at `http://localhost:9080` via a browser or any other client, like curl.
+The service can now be accessed at `http://localhost:9080` via a browser or any other client, like curl.
 
 Requesting `GET /toy` should work:
 
-```bash
+```jsonc
 ❯ curl localhost:9080/toy
 {
   "method": "GET",
@@ -153,7 +154,6 @@ Requesting `GET /toy` should work:
     "HTTP_USER_AGENT": "curl/7.68.0",
     "HTTP_ACCEPT": "*/*",
     "HTTP_X_FORWARDED_FOR": "10.244.0.1",
-    ...
     "HTTP_X_B3_SAMPLED": "0",
     "HTTP_VERSION": "HTTP/1.1"
   },

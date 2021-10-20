@@ -24,8 +24,8 @@ to provide API management with authentication and rate limit capabilities. Kuadr
 the integration of the [istio ingress gateway](https://istio.io/latest/docs/reference/config/networking/gateway/)
 with few kuadrant components to leverage the portfolio of features.
 
-* The AuthN/AuthZ enforcer [Authorino](https://github.com/Kuadrant/authorino)
-* The rate limit service [Limitador](https://github.com/Kuadrant/limitador) which exposes a [GRPC] service implementing the [Envoy Rate Limit protocol (v3)](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ratelimit/v3/rls.proto).
+* The AuthN/AuthZ enforcer [Authorino](https://github.com/Kuadrant/authorino), as the [external istio authorizer](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/) ([envoy external authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) serving [gRPC](https://grpc.io/) service).
+* The rate limit service [Limitador](https://github.com/Kuadrant/limitador) which exposes a [gRPC](https://grpc.io/) service implementing the [Envoy Rate Limit protocol (v3)](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ratelimit/v3/rls.proto).
 
 ![Kuadrant overview](kuadrant-overview.svg)
 

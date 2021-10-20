@@ -71,7 +71,7 @@ EOF
 
 Verify the APIProduct ready condition status is `true`
 
-```json
+```jsonc
 ❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -95,11 +95,11 @@ Run kubectl port-forward in a different shell:
 Forwarding from [::1]:9080 -> 8080
 ```
 
-The service be can now accessed at `http://localhost:9080` via a browser or any other client, like curl.
+The service can now be accessed at `http://localhost:9080` via a browser or any other client, like curl.
 
 As the path match expression allows, requesting `GET /v1/something` should work:
 
-```bash
+```jsonc
 ❯ curl localhost:9080/v1/something
 {
   "method": "GET",
@@ -112,7 +112,6 @@ As the path match expression allows, requesting `GET /v1/something` should work:
     "HTTP_ACCEPT": "*/*",
     "HTTP_X_FORWARDED_FOR": "10.244.0.1",
     "HTTP_X_FORWARDED_PROTO": "http",
-    ...
     "HTTP_X_B3_SAMPLED": "0",
     "HTTP_VERSION": "HTTP/1.1"
   },

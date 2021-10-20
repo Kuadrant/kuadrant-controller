@@ -75,7 +75,7 @@ For a full list of available options, check out the [APIProduct reference](/apis
 
 Verify the APIProduct ready condition status is `true`
 
-```json
+```jsonc
 ❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -99,7 +99,7 @@ Run kubectl port-forward in a different shell:
 Forwarding from [::1]:9080 -> 8080
 ```
 
-The service be can now accessed at `http://localhost:9080` via a browser or any other client, like curl.
+The service can now be accessed at `http://localhost:9080` via a browser or any other client, like curl.
 
 Without any API key, the request should fail with `401 Unauthorized`:
 
@@ -110,7 +110,7 @@ Without any API key, the request should fail with `401 Unauthorized`:
 
 On the other hand, adding the API key to the request, the request should reach the Toy Store service.
 
-```json
+```jsonc
 ❯ curl -H "Host: toystore.127.0.0.1.nip.io" -H "Authorization: APIKEY JUSTFORDEMOSOBVIOUSLY" localhost:9080/something
 {
   "method": "GET",
@@ -123,7 +123,6 @@ On the other hand, adding the API key to the request, the request should reach t
     "HTTP_ACCEPT": "*/*",
     "HTTP_AUTHORIZATION": "APIKEY JUSTFORDEMOSOBVIOUSLY",
     "HTTP_X_FORWARDED_FOR": "10.244.0.1",
-    ...
     "HTTP_X_B3_SAMPLED": "0",
     "HTTP_VERSION": "HTTP/1.1"
   },

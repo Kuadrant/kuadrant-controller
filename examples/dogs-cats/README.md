@@ -25,7 +25,7 @@ Run kubectl port-forward in a different shell:
 Forwarding from [::1]:9080 -> 8080
 ```
 
-The service be can now accessed at `http://localhost:9080` via a browser or any other client, like curl.
+The service can now be accessed at `http://localhost:9080` via a browser or any other client, like curl.
 
 ```bash
 ❯ curl -H "Authorization: APIKEY JUSTFORDEMOSOBVIOUSLYqDQsqSPMHkRhriEOtcRx" -H "Host: api.animaltoys.127.0.0.1.nip.io" localhost:9080/cats/toys

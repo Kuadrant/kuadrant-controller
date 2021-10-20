@@ -149,7 +149,7 @@ EOF
 
 Verify the APIProduct ready condition status is `true`
 
-```json
+```jsonc
 ❯ kubectl get apiproduct petstore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -173,7 +173,7 @@ Run kubectl port-forward in a different shell:
 Forwarding from [::1]:9080 -> 8080
 ```
 
-The service be can now accessed at `http://localhost:9080` via a browser or any other client, like curl.
+The service can now be accessed at `http://localhost:9080` via a browser or any other client, like curl.
 
 As the OpenAPI doc specifies, requesting `GET /pets` should work:
 

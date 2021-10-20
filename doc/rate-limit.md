@@ -97,7 +97,7 @@ For a full list of available options, check out the [APIProduct reference](/apis
 
 Verify the APIProduct ready condition status is `true`
 
-```bash
+```jsonc
 ❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -121,7 +121,7 @@ Run kubectl port-forward in a different shell:
 Forwarding from [::1]:9080 -> 8080
 ```
 
-The service be can now accessed at `http://localhost:9080` via a browser or any other client, like curl.
+The service can now be accessed at `http://localhost:9080` via a browser or any other client, like curl.
 
 The configured rate limit is: **3** request max for a period of time of **5** seconds.
 We will start running `bob`'s and `alice` traffic **concurrently**, but at different pace.
@@ -132,21 +132,19 @@ We will start running `bob`'s and `alice` traffic **concurrently**, but at diffe
 ```bash
 ❯ bash <<EOF
 run_alice_traffic(){
-    while :; do
+    for i in {1..4}; do
         curl --write-out 'ALICE %{http_code}' --silent --output /dev/null -H "Authorization: APIKEY ALICE.KEY" -H "Host: toystore.127.0.0.1.nip.io" localhost:9080/toys
         printf "\n"
         sleep 5
     done
 }
-
 run_bob_traffic(){
-    while :; do
+    for i in {1..20}; do
         curl --write-out 'BOB %{http_code}' --silent --output /dev/null -H "Authorization: APIKEY BOB.KEY" -H "Host: toystore.127.0.0.1.nip.io" localhost:9080/toys
         printf "\n"
         sleep 1
     done
 }
-
 run_bob_traffic &
 run_alice_traffic &
 wait
@@ -162,6 +160,7 @@ ALICE 200
 BOB 200
 BOB 200
 BOB 200
+BOB 429
 BOB 429
 ```
 

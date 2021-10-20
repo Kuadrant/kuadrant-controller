@@ -50,7 +50,7 @@ kuadrantctl install
 On successful command return, you should see the following deployments and pods created.
 
 ```bash
-❯ k get pods -n kuadrant-system
+❯ kubectl get pods -n kuadrant-system
 NAME                                                     READY   STATUS    RESTARTS   AGE
 authorino-controller-manager-XXXXXXXXXXX-XXXX            2/2     Running   0          3m6s
 istiod-XXXXXXXXXX-XXXXX                                  1/1     Running   0          3m11s
@@ -60,7 +60,7 @@ limitador-XXXXXXXXXX-XXXXX                               1/1     Running   0    
 limitador-operator-controller-manager-XXXXXXXXXX-XXXXX   2/2     Running   0          3m6s
 
 
-❯ k get deployments -n kuadrant-system
+❯ kubectl get deployments -n kuadrant-system
 NAME                                    READY   UP-TO-DATE   AVAILABLE   AGE
 authorino-controller-manager            1/1     1            1           4m51s
 istiod                                  1/1     1            1           4m57s
@@ -163,7 +163,7 @@ EOF
 
 Verify the APIProduct ready condition status is `true`
 
-```json
+```jsonc
 ❯ kubectl get apiproduct toystore -n default -o jsonpath="{.status}" | jq '.'
 {
   "conditions": [
@@ -187,9 +187,9 @@ Run kubectl port-forward in a different shell:
 Forwarding from [::1]:9080 -> 8080
 ```
 
-The service be can now accessed at `http://localhost:9080` via a browser or any other client, like curl.
+The service can now be accessed at `http://localhost:9080` via a browser or any other client, like curl.
 
-```bash
+```jsonc
 ❯ curl localhost:9080/toys
 {
   "method": "GET",
@@ -203,7 +203,6 @@ The service be can now accessed at `http://localhost:9080` via a browser or any 
     "HTTP_X_FORWARDED_FOR": "10.244.0.1",
     "HTTP_X_FORWARDED_PROTO": "http",
     "HTTP_X_ENVOY_INTERNAL": "true",
-    ...
     "HTTP_X_B3_SAMPLED": "0",
     "HTTP_VERSION": "HTTP/1.1"
   },
