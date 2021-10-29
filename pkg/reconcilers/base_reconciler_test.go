@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
-	"go.uber.org/zap/zapcore"
+	. "github.com/onsi/ginkgo"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,14 +35,18 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	"github.com/kuadrant/kuadrant-controller/pkg/log"
 )
 
 func TestMain(m *testing.M) {
-	log.SetLogger(zap.New(zap.Level(zapcore.DebugLevel), zap.UseDevMode(true)).WithName("test"))
+	logger := log.NewLogger(
+		log.SetLevel(log.DebugLevel),
+		log.SetMode(log.ModeDev),
+		log.WriteTo(GinkgoWriter),
+	).WithName("reconcilers_test")
+	log.SetLogger(logger)
 	os.Exit(m.Run())
 }
 

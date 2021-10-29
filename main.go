@@ -33,7 +33,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 	"github.com/kuadrant/kuadrant-controller/controllers"
@@ -59,12 +58,12 @@ func init() {
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
-	log.SetLogger(
-		zap.New(
-			zap.Level(log.ToLevel(logLevel)),
-			zap.UseDevMode(log.ToMode(logMode) == log.ModeDev),
-		).WithName("kuadrant-controller"),
-	)
+	logger := log.NewLogger(
+		log.SetLevel(log.ToLevel(logLevel)),
+		log.SetMode(log.ToMode(logMode)),
+		log.WriteTo(os.Stdout),
+	).WithName("kuadrant-controller")
+	log.SetLogger(logger)
 }
 
 func printControllerMetaInfo() {
