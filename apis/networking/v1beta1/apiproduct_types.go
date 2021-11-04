@@ -109,6 +109,9 @@ type APIProductSpec struct {
 	// dots in the name). In such a scenario, the FQDN of the host would be
 	// derived based on the underlying platform.
 	Hosts []string `json:"hosts"`
+	// Specify an existing istio gateway to use
+	// +optional
+	GatewayName string `json:"gatewayName"`
 
 	// Configure authentication mechanisms
 	// +optional

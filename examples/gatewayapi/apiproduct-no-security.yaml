@@ -1,0 +1,14 @@
+apiVersion: networking.kuadrant.io/v1beta1
+kind: APIProduct
+metadata:
+  name: store
+  namespace: default
+spec:
+  APIs:
+  - name: carstore
+    namespace: default
+  - name: bookstore
+    namespace: default    
+  gatewayName: gateway-api
+  hosts:
+  - shop.example.com

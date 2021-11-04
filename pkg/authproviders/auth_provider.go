@@ -2,6 +2,7 @@ package authproviders
 
 import (
 	"context"
+	"os"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -24,5 +25,8 @@ type AuthProvider interface {
 //	TODO: Either look for an ENV var or check the cluster capabilities
 //
 func GetAuthProvider(baseReconciler *reconcilers.BaseReconciler) AuthProvider {
+	if os.Getenv("KUADRANT_INGRESS_PROVIDER") == "gatewayapi" {
+		return authorino.NewWasmProvider(baseReconciler)
+	}
 	return authorino.New(baseReconciler)
 }

@@ -20,17 +20,29 @@ set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
+echo "setting up kuadrant for provider ${PROVIDER}"
+
 export KUADRANT_NAMESPACE="kuadrant-system"
 export KIND_CLUSTER_NAME="kuadrant-local"
 
 ${SCRIPT_DIR}/deploy-kuadrant-deps.sh
 
-echo "Building kuadrant"
+echo "Building kuadrant ${PROVIDER}"
+# deploy the gateway api 
+if [ "gatewayapi" = "$PROVIDER" ] 
+then
+  kubectl kustomize "github.com/kubernetes-sigs/gateway-api/config/crd?ref=v0.4.0" | kubectl apply -f -
+  kubectl apply -f utils/local-deployment/istio-manifests/Base/gateway-api/gateway-class.yaml
+
+  kubectl apply -f utils/local-deployment/istio-manifests/Base/gateway-api/gateway.yaml
+fi
+
+
 docker build -t kuadrant:devel ./
 kind load docker-image kuadrant:devel --name ${KIND_CLUSTER_NAME}
 echo "Deploying Kuadrant control plane"
 kustomize build config/default | kubectl -n "${KUADRANT_NAMESPACE}" apply -f -
-kubectl -n "${KUADRANT_NAMESPACE}" patch deployment kuadrant-controller-manager -p '{"spec": {"template": {"spec":{"containers":[{"name": "manager","image":"kuadrant:devel", "env": [{"name": "LOG_LEVEL", "value": "debug"}, {"name": "LOG_MODE", "value": "development"}], "imagePullPolicy":"IfNotPresent"}]}}}}'
+kubectl -n "${KUADRANT_NAMESPACE}" patch deployment kuadrant-controller-manager -p '{"spec": {"template": {"spec":{"containers":[{"name": "manager","image":"kuadrant:devel", "env": [{"name": "LOG_LEVEL", "value": "debug"}, {"name": "LOG_MODE", "value": "development"},{"name": "KUADRANT_INGRESS_PROVIDER", "value": "'$PROVIDER'" }], "imagePullPolicy":"IfNotPresent"}]}}}}'
 echo "Wait for all deployments to be up"
 kubectl -n "${KUADRANT_NAMESPACE}" wait --timeout=300s --for=condition=Available deployments --all
 

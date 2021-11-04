@@ -22,7 +22,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"istio.io/api/networking/v1alpha3"
-	gatewayapiv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 )
@@ -89,11 +89,11 @@ func (h *HTTPRouteFactory) HTTPRoute() *v1alpha3.HTTPRoute {
 	return httpRoute
 }
 
-func ConvertPathMatchType(matchType gatewayapiv1alpha1.PathMatchType) PathMatchType {
+func ConvertPathMatchType(matchType gatewayapiv1alpha2.PathMatchType) PathMatchType {
 	switch matchType {
-	case gatewayapiv1alpha1.PathMatchExact:
+	case gatewayapiv1alpha2.PathMatchExact:
 		return PathMatchExact
-	case gatewayapiv1alpha1.PathMatchPrefix:
+	case gatewayapiv1alpha2.PathMatchPathPrefix:
 		return PathMatchPrefix
 	default:
 		return PathMatchRegularExpression
@@ -164,7 +164,7 @@ func HTTPRoutesFromOAS(oasContent string, pathPrefix *string, destination networ
 	return httpRoutes, nil
 }
 
-func HTTPRoutesFromPath(pathMatch *gatewayapiv1alpha1.HTTPPathMatch, pathPrefix *string, destination networkingv1beta1.Destination) ([]*v1alpha3.HTTPRoute, error) {
+func HTTPRoutesFromPath(pathMatch *gatewayapiv1alpha2.HTTPPathMatch, pathPrefix *string, destination networkingv1beta1.Destination) ([]*v1alpha3.HTTPRoute, error) {
 	if pathMatch == nil {
 		return nil, nil
 	}

@@ -58,6 +58,9 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+              gatewayName:
+                description: Specify an existing istio gateway to use
+                type: string
               hosts:
                 description: The destination hosts to which traffic is being sent.
                   Could be a DNS name with wildcard prefix or an IP address.  Depending

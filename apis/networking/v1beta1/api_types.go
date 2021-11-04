@@ -22,7 +22,7 @@ import (
 	apiextentionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gatewayapiv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -51,7 +51,7 @@ type APIMappings struct {
 
 	// Select a HTTP route by matching the HTTP request path.
 	// +optional
-	HTTPPathMatch *gatewayapiv1alpha1.HTTPPathMatch `json:"HTTPPathMatch,omitempty"`
+	HTTPPathMatch *gatewayapiv1alpha2.HTTPPathMatch `json:"HTTPPathMatch,omitempty"`
 }
 
 // APISpec defines the desired state of API

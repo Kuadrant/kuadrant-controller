@@ -1,45 +1,43 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: dogs
+  name: bookstore
   labels:
-    svc: dogs
+    app: bookstore
 spec:
   selector:
     matchLabels:
-      svc: dogs
+      app: bookstore
   template:
     metadata:
       labels:
-        svc: dogs
+        app: bookstore
     spec:
       containers:
-        - name: dogs
+        - name: bookstore
           image: quay.io/3scale/authorino:echo-api
           env:
             - name: PORT
               value: "3000"
           ports:
             - containerPort: 3000
+              name: http
   replicas: 1
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: dogs-api
+  name: bookstore
   annotations:
-    discovery.kuadrant.io/scheme: "http"
-    discovery.kuadrant.io/api-name: "dogs"
-    discovery.kuadrant.io/tag: "production"
-    discovery.kuadrant.io/port: "80"
-    discovery.kuadrant.io/matchpath: "/"
-    discovery.kuadrant.io/matchpath-type: PathPrefix
+    discovery.kuadrant.io/matchpath: "/api/v1/books"
   labels:
-    discovery.kuadrant.io/enabled: "true"
+    discovery.kuadrant.io/enabled: "true"      
 spec:
   selector:
-    svc: dogs
+    app: bookstore
   ports:
     - port: 80
+      name: http
       protocol: TCP
       targetPort: 3000

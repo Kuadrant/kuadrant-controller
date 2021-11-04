@@ -19,7 +19,7 @@ package controllers
 import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gatewayapiv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 )
@@ -32,7 +32,7 @@ type APIFactory struct {
 	DestinationNamespace string
 	DestinationPort      *int32
 	OASContent           *string
-	HTTPPathMatch        *gatewayapiv1alpha1.HTTPPathMatch
+	HTTPPathMatch        *gatewayapiv1alpha2.HTTPPathMatch
 }
 
 func (a *APIFactory) API() *networkingv1beta1.API {

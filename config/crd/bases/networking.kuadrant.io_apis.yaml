@@ -74,23 +74,19 @@ spec:
                       path.
                     properties:
                       type:
-                        default: Prefix
+                        default: PathPrefix
                         description: "Type specifies how to match against the path
-                          Value. \n Support: Core (Exact, Prefix) \n Support: Custom
-                          (RegularExpression, ImplementationSpecific) \n Since RegularExpression
-                          PathType has custom conformance, implementations can support
-                          POSIX, PCRE or any other dialects of regular expressions.
-                          Please read the implementation's documentation to determine
-                          the supported dialect."
+                          Value. \n Support: Core (Exact, PathPrefix) \n Support:
+                          Custom (RegularExpression)"
                         enum:
                         - Exact
-                        - Prefix
+                        - PathPrefix
                         - RegularExpression
-                        - ImplementationSpecific
                         type: string
                       value:
                         default: /
                         description: Value of the HTTP path to match against.
+                        maxLength: 1024
                         type: string
                     type: object
                   OAS:

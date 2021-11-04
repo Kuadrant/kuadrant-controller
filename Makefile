@@ -2,6 +2,8 @@ SHELL := /bin/bash
 
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 PROJECT_PATH := $(patsubst %/,%,$(dir $(MKFILE_PATH)))
+# configures the env vars for kuadrant controller
+export PROVIDER ?= envoy
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
@@ -160,7 +162,7 @@ kind:
 
 # Download istioctl.
 ISTIOCTL = $(shell pwd)/bin/istioctl
-ISTIOCTLVERSION = 1.9.4
+ISTIOCTLVERSION = 1.12.0
 istioctl:
 ifeq (,$(wildcard $(ISTIOCTL)))
 	@{ \

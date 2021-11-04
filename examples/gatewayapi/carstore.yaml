@@ -1,45 +1,43 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: dogs
+  name: carstore
   labels:
-    svc: dogs
+    app: carstore
 spec:
   selector:
     matchLabels:
-      svc: dogs
+      app: carstore
   template:
     metadata:
       labels:
-        svc: dogs
+        app: carstore
     spec:
       containers:
-        - name: dogs
+        - name: carstore
           image: quay.io/3scale/authorino:echo-api
           env:
             - name: PORT
               value: "3000"
           ports:
             - containerPort: 3000
+              name: http
   replicas: 1
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: dogs-api
+  name: carstore
   annotations:
-    discovery.kuadrant.io/scheme: "http"
-    discovery.kuadrant.io/api-name: "dogs"
-    discovery.kuadrant.io/tag: "production"
-    discovery.kuadrant.io/port: "80"
-    discovery.kuadrant.io/matchpath: "/"
-    discovery.kuadrant.io/matchpath-type: PathPrefix
+    discovery.kuadrant.io/matchpath: "/api/v1/cars"
   labels:
-    discovery.kuadrant.io/enabled: "true"
+    discovery.kuadrant.io/enabled: "true"        
 spec:
   selector:
-    svc: dogs
+    app: carstore
   ports:
     - port: 80
+      name: http
       protocol: TCP
       targetPort: 3000

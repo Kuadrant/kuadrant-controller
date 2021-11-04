@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	gatewayapiv1alpha1 "sigs.k8s.io/gateway-api/apis/v1alpha1"
+	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/go-logr/logr"
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
@@ -211,7 +211,7 @@ func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service *cor
 	}
 
 	var oasContentPtr *string
-	var pathMatchPtr *gatewayapiv1alpha1.HTTPPathMatch
+	var pathMatchPtr *gatewayapiv1alpha2.HTTPPathMatch
 
 	hasOas, OASContent, err := r.isOASDefined(ctx, service)
 	if err != nil {
@@ -223,16 +223,16 @@ func (r *ServiceReconciler) APIFromAnnotations(ctx context.Context, service *cor
 	}
 
 	if !hasOas {
-		defaultType := gatewayapiv1alpha1.PathMatchPrefix
+		defaultType := gatewayapiv1alpha2.PathMatchPathPrefix
 		defaultValue := "/"
-		pathMatchPtr = &gatewayapiv1alpha1.HTTPPathMatch{Type: &defaultType, Value: &defaultValue}
+		pathMatchPtr = &gatewayapiv1alpha2.HTTPPathMatch{Type: &defaultType, Value: &defaultValue}
 		if path, ok := service.Annotations[KuadrantDiscoveryAnnotationMatchPath]; ok {
 			pathMatchPtr.Value = &path
 		}
 		if pathMatchTypeVal, ok := service.Annotations[KuadrantDiscoveryAnnotationMatchPathType]; ok {
-			pathMatchType := gatewayapiv1alpha1.PathMatchType(pathMatchTypeVal)
+			pathMatchType := gatewayapiv1alpha2.PathMatchType(pathMatchTypeVal)
 			switch pathMatchType {
-			case gatewayapiv1alpha1.PathMatchExact, gatewayapiv1alpha1.PathMatchPrefix, gatewayapiv1alpha1.PathMatchRegularExpression:
+			case gatewayapiv1alpha2.PathMatchExact, gatewayapiv1alpha2.PathMatchPathPrefix, gatewayapiv1alpha2.PathMatchRegularExpression:
 				pathMatchPtr.Type = &pathMatchType
 			default:
 				return nil, fmt.Errorf("annotation '%s' value %s is invalid", KuadrantDiscoveryAnnotationMatchPathType, pathMatchTypeVal)
