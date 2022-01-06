@@ -25,4 +25,22 @@ resources:
   kind: APIProduct
   path: github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1
   version: v1beta1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kuadrant.io
+  group: apim
+  kind: API
+  path: github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kuadrant.io
+  group: apim
+  kind: RateLimitPolicy
+  path: github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1
+  version: v1alpha1
 version: "3"

@@ -27,6 +27,7 @@ type VirtualServiceFactory struct {
 	Namespace  string
 	Hosts      []string
 	HTTPRoutes []*v1alpha3.HTTPRoute
+	Gateways   []string
 }
 
 func (v *VirtualServiceFactory) VirtualService() *istio.VirtualService {
@@ -40,7 +41,7 @@ func (v *VirtualServiceFactory) VirtualService() *istio.VirtualService {
 			Namespace: v.Namespace,
 		},
 		Spec: v1alpha3.VirtualService{
-			Gateways: []string{"kuadrant-gateway"},
+			Gateways: v.Gateways,
 			Hosts:    v.Hosts,
 			Http:     v.HTTPRoutes,
 		},
