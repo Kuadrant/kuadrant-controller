@@ -23,12 +23,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/go-logr/logr"
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
 	limitador "github.com/kuadrant/kuadrant-controller/pkg/ratelimitproviders/limitador"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
+	"github.com/kuadrant/limitador-operator/api/v1alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
+
+const finalizerName = "kuadrant.io/ratelimitpolicy"
 
 // RateLimitPolicyReconciler reconciles a RateLimitPolicy object
 type RateLimitPolicyReconciler struct {
@@ -56,8 +62,27 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 
 	var rlp apimv1alpha1.RateLimitPolicy
 	if err := r.Client().Get(ctx, req.NamespacedName, &rlp); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Error(err, "no rate limit policy found.")
+			return ctrl.Result{}, nil
+		}
 		logger.Error(err, "failed to get RateLimitPolicy")
 		return ctrl.Result{}, err
+	}
+
+	if rlp.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&rlp, finalizerName) {
+		controllerutil.RemoveFinalizer(&rlp, finalizerName)
+		if err := r.BaseReconciler.UpdateResource(ctx, &rlp); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if !controllerutil.ContainsFinalizer(&rlp, finalizerName) {
+		controllerutil.AddFinalizer(&rlp, finalizerName)
+		if err := r.BaseReconciler.UpdateResource(ctx, &rlp); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
 	}
 
 	specResult, specErr := r.reconcileSpec(ctx, &rlp)
@@ -69,6 +94,20 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 	return ctrl.Result{}, nil
 }
 
+func alwaysUpdateRateLimit(existingObj, desiredObj client.Object) (bool, error) {
+	existing, ok := existingObj.(*v1alpha1.RateLimit)
+	if !ok {
+		return false, fmt.Errorf("%T is not a *networkingv1beta1.RateLimit", existingObj)
+	}
+	desired, ok := desiredObj.(*v1alpha1.RateLimit)
+	if !ok {
+		return false, fmt.Errorf("%T is not a *networkingv1beta1.RateLimit", desiredObj)
+	}
+
+	existing.Spec = desired.Spec
+	return true, nil
+}
+
 func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) (ctrl.Result, error) {
 	logger := r.Logger()
 
@@ -76,7 +115,7 @@ func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apim
 	for i, rlSpec := range rlp.Spec.Limits {
 		ratelimitfactory := limitador.RateLimitFactory{
 			Key: types.NamespacedName{
-				Name:      fmt.Sprintf("%s.limit-%d", rlp.Name, i+1),
+				Name:      fmt.Sprintf("%s-limit-%d", rlp.Name, i+1),
 				Namespace: rlp.Namespace,
 			},
 			Conditions: rlSpec.Conditions,
@@ -87,13 +126,17 @@ func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apim
 		}
 
 		ratelimit := ratelimitfactory.RateLimit()
-
-		if err := r.Client().Create(ctx, ratelimit); err != nil {
-			logger.Error(err, "failed to create RateLimit resource")
+		if err := controllerutil.SetOwnerReference(rlp, ratelimit, r.Client().Scheme()); err != nil {
+			logger.Error(err, "failed to add owner ref to RateLimit resource")
+			return ctrl.Result{}, err
+		}
+		err := r.BaseReconciler.ReconcileResource(ctx, &v1alpha1.RateLimit{}, ratelimit, alwaysUpdateRateLimit)
+		if err != nil {
+			logger.Error(err, "ReconcileResource failed to create/update RateLimit resource")
 			return ctrl.Result{}, err
 		}
 	}
-	logger.Info("successfully created RateLimit resources")
+	logger.Info("successfully created/updated RateLimit resources")
 	return ctrl.Result{}, nil
 }
 

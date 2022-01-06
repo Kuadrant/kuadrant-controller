@@ -257,7 +257,7 @@ func rateLimitFiltersPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 	return factory.EnvoyFilter()
 }
 
-func routeRateLimitsPatch(vHostName, routeName string, actions *[]apimv1alpha1.Action_Specifier, stage int) *istio.EnvoyFilter {
+func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.Action_Specifier, stage int) *istio.EnvoyFilter {
 	patchUnstructured := map[string]interface{}{
 		"operation": "MERGE",
 		"value": map[string]interface{}{
