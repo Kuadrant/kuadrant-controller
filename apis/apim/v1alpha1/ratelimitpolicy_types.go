@@ -45,7 +45,7 @@ type RateLimitPolicySpec struct {
 	Phases []string `json:"phases"`
 	Rules  []Rule   `json:"rules"`
 	// these actions are used for all of the matching rules
-	Actions *[]Action_Specifier               `json:"actions,omitempty"`
+	Actions []Action_Specifier                `json:"actions,omitempty"`
 	Limits  []limitadorv1alpha1.RateLimitSpec `json:"limits"`
 }
 
