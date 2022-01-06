@@ -97,9 +97,6 @@ func (r *APIReconciler) Reconcile(eventCtx context.Context, req ctrl.Request) (c
 						routeName := rule.Method + rule.URI
 						vHostName := domain + ":80" // Not sure if port is listener's or virtualservice destination
 
-						if rule.Actions == nil {
-							continue
-						}
 						routePatch := routeRateLimitsPatch(vHostName, routeName, rule.Actions, rateLimitStage)
 						if err := r.Client().Create(ctx, routePatch); err != nil {
 							logger.Error(err, "failed to create route specific rate limit patch")
