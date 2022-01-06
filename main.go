@@ -34,8 +34,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
+	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 	"github.com/kuadrant/kuadrant-controller/controllers"
+	apimcontrollers "github.com/kuadrant/kuadrant-controller/controllers/apim"
 	"github.com/kuadrant/kuadrant-controller/pkg/authproviders"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	"github.com/kuadrant/kuadrant-controller/pkg/ingressproviders"
@@ -56,6 +58,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(networkingv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(apimv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	logger := log.NewLogger(
@@ -130,6 +133,34 @@ func main() {
 		BaseReconciler: serviceBaseReconciler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
+		os.Exit(1)
+	}
+
+	apiBaseReconciler := reconcilers.NewBaseReconciler(
+		mgr.GetClient(), mgr.GetScheme(), mgr.GetAPIReader(),
+		log.Log.WithName("api"),
+		mgr.GetEventRecorderFor("API"),
+	)
+
+	if err = (&apimcontrollers.APIReconciler{
+		BaseReconciler: apiBaseReconciler,
+		Scheme:         mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "API")
+		os.Exit(1)
+	}
+
+	rateLimitPolicyBaseReconciler := reconcilers.NewBaseReconciler(
+		mgr.GetClient(), mgr.GetScheme(), mgr.GetAPIReader(),
+		log.Log.WithName("ratelimitpolicy"),
+		mgr.GetEventRecorderFor("RateLimitPolicy"),
+	)
+
+	if err = (&apimcontrollers.RateLimitPolicyReconciler{
+		BaseReconciler: rateLimitPolicyBaseReconciler,
+		Scheme:         mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RateLimitPolicy")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
