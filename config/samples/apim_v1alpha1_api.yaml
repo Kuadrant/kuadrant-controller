@@ -1,0 +1,28 @@
+apiVersion: apim.kuadrant.io/v1alpha1
+kind: API
+metadata:
+  name: api-sample
+spec:
+  domains:
+    - "*.toystore.com"
+  gateways:
+    - "kuadrant-system/kuadrant-gateway"
+  info:
+    version: "1.0"
+    title: toystore-api
+  upstreams:
+    - serviceName: toystore
+      namespace: default
+      port: 80
+  paths:
+    /getToy:
+      get: {}
+    /admin/addToy:
+      post:
+        upstreams:
+          - serviceName: toystore
+            namespace: default
+            port: 80
+  rateLimitSelector:
+    app: toystore
+  

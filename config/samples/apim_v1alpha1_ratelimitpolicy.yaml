@@ -1,0 +1,29 @@
+apiVersion: apim.kuadrant.io/v1alpha1
+kind: RateLimitPolicy
+metadata:
+  name: ratelimitpolicy-sample
+  namespace: kuadrant-system
+  labels:
+    app: toystore
+spec:
+  phases: ["postAuth"]
+  rules:
+    - uri: /admin/addToy
+      method: POST
+      actions:
+        - generic_key:
+            descriptor_key: admin
+            descriptor_value: "yes"
+    - uri: /getToy
+      method: GET
+  actions:
+    - generic_key:
+        descriptor_key: admin
+        descriptor_value: "yes"
+  limits:
+    - conditions: ["admin == yes"]
+      max_value: 2
+      namespace: preauth
+      seconds: 15
+      variables: []
+
