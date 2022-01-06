@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
@@ -119,6 +120,10 @@ func postAuthEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1a
 	}
 
 	return factory.EnvoyFilter()
+}
+
+func EnvoyPatch(rlp *apimv1alpha1.RateLimitPolicy) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+	return nil
 }
 
 func preAuthActionsEnvoyPatch(apip *networkingv1beta1.APIProduct, host string) *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
