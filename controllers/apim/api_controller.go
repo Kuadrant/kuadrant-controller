@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/go-logr/logr"
 	"github.com/gogo/protobuf/types"
@@ -33,11 +34,14 @@ import (
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 	networkingv1alpha3 "istio.io/api/networking/v1alpha3"
 	istio "istio.io/client-go/pkg/apis/networking/v1alpha3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
 	preAuthRLStage  = 0
 	postAuthRLStage = 1
+
+	APIFinalizerName = "kuadrant.io/envoyfilters"
 )
 
 // APIReconciler reconciles a API object
@@ -57,50 +61,110 @@ func (r *APIReconciler) Reconcile(eventCtx context.Context, req ctrl.Request) (c
 
 	var api apimv1alpha1.API
 	if err := r.Client().Get(ctx, req.NamespacedName, &api); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("no API resource found.")
+			return ctrl.Result{}, nil
+		}
 		logger.Error(err, "failed to get API object")
 		return ctrl.Result{}, err
 	}
 
-	virtualService := createVirtualService(&api)
-	if err := r.Client().Create(ctx, virtualService); err != nil {
-		logger.Error(err, "failed to create virtual service")
-		return ctrl.Result{}, err
-	}
-
-	rateLimitPatch := rateLimitFiltersPatch(client.ObjectKey{
-		Name:      "kuadrant-gateway",
-		Namespace: "kuadrant-system",
-	})
-	if err := r.Client().Create(ctx, rateLimitPatch); err != nil {
-		logger.Error(err, "failed to add rate limit filters")
-		return ctrl.Result{}, err
-	}
-
-	if api.Spec.RateLimitSelector != nil {
-		rlpList := &apimv1alpha1.RateLimitPolicyList{}
-		matchingLabels := client.MatchingLabels{}
-		matchingLabels = *api.Spec.RateLimitSelector // interface requirements
-		if err := r.Client().List(ctx, rlpList, matchingLabels); err != nil {
-			logger.Error(err, "failed to fetch ratelimitpolicy list")
+	if api.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&api, APIFinalizerName) {
+		controllerutil.RemoveFinalizer(&api, APIFinalizerName)
+		if err := r.BaseReconciler.UpdateResource(ctx, &api); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{Requeue: true}, err
 		}
+		return ctrl.Result{}, nil
+	}
 
-		for _, rlp := range rlpList.Items {
-			for _, domain := range api.Spec.Domains {
-				// Only two possiblity of phases: {Pre,Post}Auth
-				for _, phase := range rlp.Spec.Phases {
-					rateLimitStage := 0
-					if phase == "postAuth" {
-						rateLimitStage = 1
-					}
+	if !controllerutil.ContainsFinalizer(&api, APIFinalizerName) {
+		controllerutil.AddFinalizer(&api, APIFinalizerName)
+		if err := r.BaseReconciler.UpdateResource(ctx, &api); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+	}
 
-					for _, rule := range rlp.Spec.Rules {
-						routeName := rule.Method + rule.URI
-						vHostName := domain + ":80" // Not sure if port is listener's or virtualservice destination
+	// get the list of matching virtualservices
+	vslist := &istio.VirtualServiceList{}
+	if len(api.Spec.VirtualServiceSelector) != 0 {
+		matchingLabels := client.MatchingLabels{}
+		matchingLabels = api.Spec.VirtualServiceSelector // interface requirements
 
-						routePatch := routeRateLimitsPatch(vHostName, routeName, rule.Actions, rateLimitStage)
-						if err := r.Client().Create(ctx, routePatch); err != nil {
-							logger.Error(err, "failed to create route specific rate limit patch")
-							return ctrl.Result{}, err
+		if err := r.Client().List(ctx, vslist, matchingLabels); err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Info("no matching virtualservice resource found")
+				return ctrl.Result{}, nil
+			}
+			logger.Error(err, "failed to fetch virtualservice list")
+			return ctrl.Result{}, err
+		}
+	}
+	logger.Info("number of virtualservices matched", "count", len(vslist.Items))
+
+	rlpList := &apimv1alpha1.RateLimitPolicyList{}
+	if len(api.Spec.RateLimitSelector) != 0 {
+		matchingLabels := client.MatchingLabels{}
+		matchingLabels = api.Spec.RateLimitSelector // interface requirements
+
+		if err := r.Client().List(ctx, rlpList, matchingLabels); err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Error(err, "no ratelimitpolicy resource found")
+				return ctrl.Result{}, nil
+			}
+			logger.Error(err, "failed to fetch ratelimitpolicy list")
+			return ctrl.Result{}, err
+		}
+	}
+	logger.Info("number of ratelimitpolicies matched", "count", len(rlpList.Items))
+
+	for _, vs := range vslist.Items {
+		vsNamespace := vs.Namespace
+		for _, gateway := range vs.Spec.Gateways {
+			objectKey := gatewayNameToObjectKey(gateway, vsNamespace)
+			rateLimitPatch := rateLimitInitialPatch(objectKey)
+
+			if err := controllerutil.SetOwnerReference(&api, rateLimitPatch, r.Client().Scheme()); err != nil {
+				logger.Error(err, "failed to add owner ref to RateLimit filters patch")
+				return ctrl.Result{}, err
+			}
+			if err := r.Client().Create(ctx, rateLimitPatch); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					logger.Error(err, "failed to patch-in RateLimit filters")
+					return ctrl.Result{}, err
+				}
+			}
+			logger.Info("created RateLimit filters patch")
+
+			for _, host := range vs.Spec.Hosts {
+				for _, rlp := range rlpList.Items {
+					for _, route := range rlp.Spec.Routes {
+						isRouteMatch := doesRouteMatch(vs.Spec.Http, route.Name)
+						if !isRouteMatch {
+							logger.Info("no match found for route %s", route.Name)
+							continue
+						}
+
+						vHostName := host + ":80"
+						var routePatchs []*istio.EnvoyFilter
+						if route.Stage == apimv1alpha1.RateLimitStage_BOTH {
+							routePatchs = append(routePatchs, routeRateLimitsPatch(vHostName, route.Name, route.Actions, apimv1alpha1.RateLimitStage_PREAUTH))
+							routePatchs = append(routePatchs, routeRateLimitsPatch(vHostName, route.Name, route.Actions, apimv1alpha1.RateLimitStage_POSTAUTH))
+						} else {
+							routePatchs = append(routePatchs, routeRateLimitsPatch(vHostName, route.Name, route.Actions, route.Stage))
+						}
+
+						for _, routePatch := range routePatchs {
+							if err := controllerutil.SetOwnerReference(&api, routePatch, r.Client().Scheme()); err != nil {
+								logger.Error(err, "failed to add owner ref to route-level ratelimits patch")
+								return ctrl.Result{}, err
+							}
+							if err := r.Client().Create(ctx, routePatch); err != nil {
+								if !apierrors.IsAlreadyExists(err) {
+									logger.Error(err, "failed to create route specific rate limit patch %s", routePatch.Name)
+									return ctrl.Result{}, err
+								}
+							}
+							logger.Info("created route level ratelimits patch", "name", routePatch.Name)
 						}
 					}
 				}
@@ -111,63 +175,32 @@ func (r *APIReconciler) Reconcile(eventCtx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
-// createVirtualService creates a virtualservice from Kuadrant's API resource
-func createVirtualService(api *apimv1alpha1.API) *istio.VirtualService {
-	httpRoutes := []*networkingv1alpha3.HTTPRoute{}
-	httpMatchRequests := []*networkingv1alpha3.HTTPMatchRequest{}
-	for path, operation := range api.Spec.Paths {
-		method := "GET"
-		if operation.Post != nil {
-			method = "POST"
+func doesRouteMatch(routeList []*networkingv1alpha3.HTTPRoute, targetRouteName string) bool {
+	for _, route := range routeList {
+		for _, match := range route.Match {
+			if match.Name == targetRouteName {
+				return true
+			}
 		}
-		// name is used for selecting ratelimited routes.
-		matchRequestName := method + path
-		httpMatchRequest := &networkingv1alpha3.HTTPMatchRequest{
-			Name: matchRequestName,
-			Uri: &networkingv1alpha3.StringMatch{
-				MatchType: &networkingv1alpha3.StringMatch_Exact{
-					Exact: path,
-				},
-			},
-			Method: &networkingv1alpha3.StringMatch{
-				MatchType: &networkingv1alpha3.StringMatch_Exact{
-					Exact: method,
-				},
-			},
-		}
-		httpMatchRequests = append(httpMatchRequests, httpMatchRequest)
 	}
-
-	// right now only allowing one destination.
-	httpRoute := &networkingv1alpha3.HTTPRoute{
-		Match: httpMatchRequests,
-		Route: []*networkingv1alpha3.HTTPRouteDestination{
-			{
-				Destination: &networkingv1alpha3.Destination{
-					Host: api.Spec.Upstreams[0].ServiceName,
-					Port: &networkingv1alpha3.PortSelector{
-						Number: api.Spec.Upstreams[0].Port,
-					},
-				},
-			},
-		},
-	}
-	httpRoutes = append(httpRoutes, httpRoute)
-
-	factory := istioprovider.VirtualServiceFactory{
-		ObjectName: api.Name + "-" + api.Namespace,
-		Namespace:  api.Namespace,
-		Hosts:      api.Spec.Domains,
-		HTTPRoutes: httpRoutes,
-		Gateways:   api.Spec.Gateways,
-	}
-
-	return factory.VirtualService()
+	return false
 }
 
-// rateLimitEnvoyFilters returns EnvoyFilter that patches pre and post auth
-// filters to the given gateway object.
-func rateLimitFiltersPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
+// gatewayNameToObjectKey converts <namespace/name> format string to k8 object key
+func gatewayNameToObjectKey(gatewayName, defaultNamespace string) client.ObjectKey {
+	split := strings.Split(gatewayName, "/")
+	if len(split) == 2 {
+		return client.ObjectKey{Name: split[1], Namespace: split[0]}
+	}
+	return client.ObjectKey{Namespace: defaultNamespace, Name: split[0]}
+}
+
+// rateLimitInitialPatch returns EnvoyFilter resource that patches-in
+// - Add Preauth RateLimit Filter
+// - Add PostAuth RateLimit Filter
+// - Change cluster name pointing to Limitador in kuadrant-system namespace
+// Note please make sure this patch is only created once per gateway.
+func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 
 	patchUnstructured := map[string]interface{}{
 		"operation": "INSERT_BEFORE",
@@ -201,7 +234,7 @@ func rateLimitFiltersPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 	if err != nil {
 		panic(err)
 	}
-	postPatch := prePatch
+	postPatch := prePatch.DeepCopy()
 	postPatch.Value.Fields["name"] = &types.Value{
 		Kind: &types.Value_StringValue{
 			StringValue: "envoy.filters.http.postauth.ratelimit",
@@ -220,7 +253,7 @@ func rateLimitFiltersPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 		},
 	}
 
-	preEnvoyFilterPatch := networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
+	preAuthFilterPatch := networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: networkingv1alpha3.EnvoyFilter_HTTP_FILTER,
 		Match: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
 			Context: networkingv1alpha3.EnvoyFilter_GATEWAY,
@@ -241,31 +274,57 @@ func rateLimitFiltersPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 		Patch: &prePatch,
 	}
 
-	postEnvoyFilterPatch := preEnvoyFilterPatch
-	postEnvoyFilterPatch.Patch = &postPatch
+	postAuthFilterPatch := preAuthFilterPatch
+	postAuthFilterPatch.Patch = postPatch
+
+	clusterPatch := networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
+		ApplyTo: networkingv1alpha3.EnvoyFilter_CLUSTER,
+		Match: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
+			Context: networkingv1alpha3.EnvoyFilter_GATEWAY,
+			ObjectTypes: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Cluster{
+				Cluster: &networkingv1alpha3.EnvoyFilter_ClusterMatch{
+					Name: "outbound|8081||limitador.kuadrant-system.svc.cluster.local",
+				},
+			},
+		},
+		Patch: &networkingv1alpha3.EnvoyFilter_Patch{
+			Operation: networkingv1alpha3.EnvoyFilter_Patch_MERGE,
+			Value: &types.Struct{
+				Fields: map[string]*types.Value{
+					"name": {
+						Kind: &types.Value_StringValue{
+							StringValue: "rate-limit-cluster",
+						},
+					},
+				},
+			},
+		},
+	}
 
 	factory := istioprovider.EnvoyFilterFactory{
 		ObjectName: gateway.Name + "-ratelimit-filters",
 		Namespace:  gateway.Namespace,
 		Patches: []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 			// Ordering matters here!
-			&preEnvoyFilterPatch,
-			&postEnvoyFilterPatch,
+			&preAuthFilterPatch,
+			&postAuthFilterPatch,
+			&clusterPatch,
 		},
 	}
 
 	return factory.EnvoyFilter()
 }
 
-func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.Action_Specifier, stage int) *istio.EnvoyFilter {
+func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.Action_Specifier, stage apimv1alpha1.RateLimit_Stage) *istio.EnvoyFilter {
+	stage_value := apimv1alpha1.RateLimit_Stage_value[stage]
 	patchUnstructured := map[string]interface{}{
 		"operation": "MERGE",
 		"value": map[string]interface{}{
 			"route": map[string]interface{}{
 				"rate_limits": []map[string]interface{}{
 					{
-						"stage":   stage,
-						"actions": "ACTIONS",
+						"stage":   stage_value,
+						"actions": "ACTIONS", // this is replaced with actual value below
 					},
 				},
 			},
@@ -279,7 +338,7 @@ func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.A
 		return nil
 	}
 
-	// A nice trick to make things easy.
+	// A nice trick to make it easier add-in actions
 	stringPatch := string(patchRaw)
 	stringPatch = strings.Replace(stringPatch, "\"ACTIONS\"", string(jsonActions), 1)
 	fmt.Printf("STRING PATCH: %v", stringPatch)

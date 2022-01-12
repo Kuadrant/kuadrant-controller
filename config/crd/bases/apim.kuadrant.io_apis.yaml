@@ -39,14 +39,6 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
-              domains:
-                items:
-                  type: string
-                type: array
-              gateways:
-                items:
-                  type: string
-                type: array
               info:
                 properties:
                   description:
@@ -74,59 +66,16 @@ spec:
                 - title
                 - version
                 type: object
-              paths:
-                additionalProperties:
-                  properties:
-                    get:
-                      type: object
-                    post:
-                      properties:
-                        upstreams:
-                          items:
-                            properties:
-                              namespace:
-                                type: string
-                              port:
-                                format: int32
-                                type: integer
-                              serviceName:
-                                type: string
-                              tls:
-                                type: string
-                              url:
-                                type: string
-                            type: object
-                          type: array
-                      required:
-                      - upstreams
-                      type: object
-                  type: object
-                type: object
               rateLimitSelector:
                 additionalProperties:
                   type: string
                 type: object
-              upstreams:
-                items:
-                  properties:
-                    namespace:
-                      type: string
-                    port:
-                      format: int32
-                      type: integer
-                    serviceName:
-                      type: string
-                    tls:
-                      type: string
-                    url:
-                      type: string
-                  type: object
-                type: array
+              virtualServiceSelector:
+                additionalProperties:
+                  type: string
+                type: object
             required:
-            - domains
             - info
-            - paths
-            - upstreams
             type: object
         required:
         - spec

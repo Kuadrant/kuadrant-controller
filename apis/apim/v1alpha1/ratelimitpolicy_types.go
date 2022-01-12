@@ -33,17 +33,41 @@ type Action_Specifier struct {
 	GenericKey RL_GenericKey `json:"generic_key"`
 }
 
-type Rule struct {
-	URI    string `json:"uri"`
-	Method string `json:"method"`
+// +kubebuilder:validation:Enum=PREAUTH;POSTAUTH;BOTH
+type RateLimit_Stage string
+
+const (
+	RateLimitStage_PREAUTH  RateLimit_Stage = "PREAUTH"
+	RateLimitStage_POSTAUTH RateLimit_Stage = "POSTAUTH"
+	RateLimitStage_BOTH     RateLimit_Stage = "BOTH"
+)
+
+var RateLimit_Stage_name = map[int32]string{
+	0: "PREAUTH",
+	1: "POSTAUTH",
+	2: "BOTH",
+}
+
+var RateLimit_Stage_value = map[RateLimit_Stage]int32{
+	"PREAUTH":  0,
+	"POSTAUTH": 1,
+	"BOTH":     2,
+}
+
+type Route struct {
+	// name of the route present in the virutalservice
+	Name string `json:"name"`
+	// Definfing phase at which rate limits will be applied.
+	// Valid values are: PREAUTH, POSTAUTH, BOTH
+	Stage RateLimit_Stage `json:"stage"`
 	// rule specific actions
 	Actions []*Action_Specifier `json:"actions,omitempty"`
 }
 
 // RateLimitPolicySpec defines the desired state of RateLimitPolicy
 type RateLimitPolicySpec struct {
-	Phases []string `json:"phases"`
-	Rules  []Rule   `json:"rules"`
+	// route specific staging and actions
+	Routes []Route `json:"routes"`
 	// these actions are used for all of the matching rules
 	Actions []*Action_Specifier               `json:"actions,omitempty"`
 	Limits  []limitadorv1alpha1.RateLimitSpec `json:"limits"`
