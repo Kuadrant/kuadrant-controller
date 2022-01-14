@@ -4,6 +4,7 @@
 resources:
 - bases/networking.kuadrant.io_apis.yaml
 - bases/networking.kuadrant.io_apiproducts.yaml
+- bases/networking.kuadrant.io_wasmfilters.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
@@ -12,6 +13,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_apis.yaml
 #- patches/webhook_in_apiproducts.yaml
 #- patches/webhook_in_services.yaml
+#- patches/webhook_in_wasmfilters.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable webhook, uncomment all the sections with [CERTMANAGER] prefix.
@@ -19,6 +21,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_apis.yaml
 #- patches/cainjection_in_apiproducts.yaml
 #- patches/cainjection_in_services.yaml
+#- patches/cainjection_in_wasmfilters.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 patchesJson6902:

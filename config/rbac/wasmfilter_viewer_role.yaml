@@ -1,0 +1,20 @@
+# permissions for end users to view wasmfilters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wasmfilter-viewer-role
+rules:
+- apiGroups:
+  - networking.kuadrant.io
+  resources:
+  - wasmfilters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.kuadrant.io
+  resources:
+  - wasmfilters/status
+  verbs:
+  - get

@@ -1,0 +1,25 @@
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: HTTPRoute
+metadata:
+  name: store
+  namespace: default
+spec:
+  parentRefs:
+  - name: gateway-api
+    namespace: kuadrant-system
+  hostnames: ["store.example.com"]
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /api/v1/cars
+    backendRefs:
+    - name: carstore
+      port: 80
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /api/v1/books
+    backendRefs:
+    - name: bookstore
+      port: 80

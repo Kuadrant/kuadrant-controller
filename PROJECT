@@ -25,4 +25,13 @@ resources:
   kind: APIProduct
   path: github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1
   version: v1beta1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kuadrant.io
+  group: networking
+  kind: WASMFilter
+  path: github.com/kuadrant/kuadrant-controller/apis/networking/v1alpha1
+  version: v1alpha1
 version: "3"

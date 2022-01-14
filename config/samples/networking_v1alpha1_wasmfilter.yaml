@@ -1,0 +1,6 @@
+apiVersion: networking.kuadrant.io/v1alpha1
+kind: WASMFilter
+metadata:
+  name: wasmfilter-sample
+spec:
+  # TODO(user): Add fields here

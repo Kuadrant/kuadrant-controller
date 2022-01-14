@@ -1,0 +1,26 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: new-patch
+  namespace: kuadrant-system
+spec:
+  configPatches:
+    - applyTo: HTTP_ROUTE
+      match:
+        context: GATEWAY
+        routeConfiguration:
+          vhost:
+            name: store.example.com:80
+      patch:
+        operation: MERGE
+        value:
+          route:
+            rate_limits:
+              - stage: 0
+                actions:
+                  - request_headers:
+                      header_name: ":path"
+                      descriptor_key: "req.path"    
+                  - request_headers:
+                      header_name: ":method"
+                      descriptor_key: "req.method"                          

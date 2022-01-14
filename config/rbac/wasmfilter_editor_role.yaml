@@ -1,0 +1,24 @@
+# permissions for end users to edit wasmfilters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wasmfilter-editor-role
+rules:
+- apiGroups:
+  - networking.kuadrant.io
+  resources:
+  - wasmfilters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.kuadrant.io
+  resources:
+  - wasmfilters/status
+  verbs:
+  - get

@@ -34,8 +34,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
+	networkingv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1alpha1"
 	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
 	"github.com/kuadrant/kuadrant-controller/controllers"
+	networkingcontrollers "github.com/kuadrant/kuadrant-controller/controllers/networking"
 	"github.com/kuadrant/kuadrant-controller/pkg/authproviders"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	"github.com/kuadrant/kuadrant-controller/pkg/ingressproviders"
@@ -56,6 +58,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(networkingv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(networkingv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	logger := log.NewLogger(
@@ -116,6 +119,12 @@ func main() {
 		mgr.GetEventRecorderFor("Service"),
 	)
 
+	wasmfilterBaseReconciler := reconcilers.NewBaseReconciler(
+		mgr.GetClient(), mgr.GetScheme(), mgr.GetAPIReader(),
+		log.Log.WithName("wasmfilter"),
+		mgr.GetEventRecorderFor("WASMFilter"),
+	)
+
 	if err = (&controllers.APIProductReconciler{
 		BaseReconciler:    apiProductBaseReconciler,
 		AuthProvider:      authproviders.GetAuthProvider(apiProductBaseReconciler),
@@ -130,6 +139,14 @@ func main() {
 		BaseReconciler: serviceBaseReconciler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
+		os.Exit(1)
+	}
+	if err = (&networkingcontrollers.WASMFilterReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		BaseReconciler: wasmfilterBaseReconciler,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "WASMFilter")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

@@ -23,12 +23,22 @@ import (
 )
 
 type EnvoyFilterFactory struct {
-	ObjectName string
-	Namespace  string
-	Patches    []*istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
+	ObjectName     string
+	Namespace      string
+	Patches        []*istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
+	WorkLoadLabels map[string]string
 }
 
 func (v *EnvoyFilterFactory) EnvoyFilter() *istionetworkingv1alpha3.EnvoyFilter {
+
+	workloads := &istioapiv1alpha3.WorkloadSelector{}
+
+	if len(v.WorkLoadLabels) == 0 {
+		workloads.Labels = map[string]string{"istio": "kuadrant-system"}
+	} else {
+		workloads.Labels = v.WorkLoadLabels
+	}
+
 	return &istionetworkingv1alpha3.EnvoyFilter{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "EnvoyFilter",
@@ -39,10 +49,8 @@ func (v *EnvoyFilterFactory) EnvoyFilter() *istionetworkingv1alpha3.EnvoyFilter 
 			Namespace: v.Namespace,
 		},
 		Spec: istioapiv1alpha3.EnvoyFilter{
-			WorkloadSelector: &istioapiv1alpha3.WorkloadSelector{
-				Labels: map[string]string{"istio": "kuadrant-system"},
-			},
-			ConfigPatches: v.Patches,
+			WorkloadSelector: workloads,
+			ConfigPatches:    v.Patches,
 		},
 	}
 }

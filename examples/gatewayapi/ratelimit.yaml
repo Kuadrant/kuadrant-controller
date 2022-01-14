@@ -1,0 +1,11 @@
+apiVersion: limitador.kuadrant.io/v1alpha1
+kind: RateLimit
+metadata:
+  name: store-ratelimit
+  namespace: kuadrant-system
+spec:
+  conditions: ["generic_key == kuadrant"]
+  max_value: 1
+  namespace: store.default
+  seconds: 10
+  variables: []

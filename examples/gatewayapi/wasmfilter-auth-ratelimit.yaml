@@ -1,0 +1,20 @@
+apiVersion: networking.kuadrant.io/v1alpha1
+kind: WASMFilter
+metadata:
+  name: store-auth-limit 
+  namespace: default
+spec: 
+  # the wasmplugin type to apply
+  type: "kuadrant-authenticated-ratelimit" # is injected at unspecified phase (last in the chain before hitting the router)  
+  # the config for the wasm plugin
+  httpRouteRef: # this wont be needed if wasmfilter is an extensionRef for httproute filters using it for now to build workload selector
+    name: store
+    backends: ["carstore","bookstore"] # if empty then all backends
+  pluginConfig:
+      exclude_pattern: "^/api/v1/cars/login" #this decides which APIs will not be sent to Authorino
+      domain: "store.default"
+      actions:
+      - metadata:
+          metadata_key: 
+          descriptor_value: "authenticated"
+                #skip_if_absent: true

@@ -60,6 +60,20 @@ func (is *IstioProvider) reconcileRateLimit(ctx context.Context, apip *networkin
 	return nil
 }
 
+func (is *IstioProvider) ReconcileClusterPatch(ctx context.Context, name, namespace string, labels map[string]string) error {
+	factory := EnvoyFilterFactory{
+		ObjectName:     fmt.Sprintf("%s.%s-rate-limit-cluster", name, namespace),
+		Namespace:      common.KuadrantNamespace,
+		Patches:        make([]*istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, 0),
+		WorkLoadLabels: labels,
+	}
+	factory.Patches = append(factory.Patches, clusterEnvoyPatch())
+	if err := is.ReconcileIstioEnvoyFilter(ctx, factory.EnvoyFilter(), envoyFilterBasicMutator); err != nil {
+		return err
+	}
+	return nil
+}
+
 func clusterEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1alpha3.EnvoyFilter {
 	factory := EnvoyFilterFactory{
 		ObjectName: fmt.Sprintf("%s.%s-rate-limit-cluster", apip.Name, apip.Namespace),

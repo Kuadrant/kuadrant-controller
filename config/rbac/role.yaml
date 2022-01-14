@@ -138,6 +138,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - networking.kuadrant.io
+  resources:
+  - wasmfilters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.kuadrant.io
+  resources:
+  - wasmfilters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - networking.kuadrant.io
+  resources:
+  - wasmfilters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - security.istio.io
   resources:
   - authorizationpolicies

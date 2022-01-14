@@ -1,0 +1,14 @@
+apiVersion: networking.kuadrant.io/v1alpha1
+kind: WASMFilter
+metadata:
+  name: store
+  namespace: default
+spec: 
+  # the wasmplugin type to apply
+  type: "kuadrant-authentication" # is injected at unspecified phase (last in the chain before hitting the router)  
+  # the config for the wasm plugin
+  httpRouteRef: # this wont be needed if wasmfilter is an extensionRef for httproute filters using it for now to build workload selector
+    name: store
+    backends: [] # if empty then all backends
+  pluginConfig:
+    excludePattern: "^/api/v2/store/login" #this decides which APIs will not be sent to Authorino

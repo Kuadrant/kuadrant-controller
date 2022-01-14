@@ -1,0 +1,27 @@
+apiVersion: networking.kuadrant.io/v1beta1
+kind: WASMFilter
+metadata:
+  name: store
+  namespace: default
+spec:
+  type: "apimgmt"
+  config:    # the actual rate limits to apply are created as part of the rate limit CR
+    authentication:
+      auth_cluster: "outbound|50051||authorino-authorino-authorization.default.svc.cluster.local" #might not need to expose this
+      failure_mode_deny: true
+      pattern: "^\/api/v2/.*" #this decides which APIs will be sent to Authorino .* will send everything
+    ratelimit:
+      authenticated: # this is equivilant to adding the metadata action below
+        Patterns: 
+        - "^/api/v2/profile.*" # this will decide which APIs should be authenticated before sending to rate limit anything not matched will not be authenticated first but will still be subject to the ratelimit CR config. Internally the plugin will pull out the metadata userid 
+      actions: # informs the plugin if any additional info should be sent. Follows the envoy actions spec some common ones are shorthanded (e.g authenticated)
+        - request_headers:
+          header_name: ":path"
+          descriptor_key: "PATH" 
+        - metadata :
+            metadata_key:
+              key: "envoy.filters.http.ext_authz"  # where in the metadata to find this value
+              path :
+                - key: "ext_auth_data"
+                - key: "user-id" # the path from the top level to the value
+              descriptor_key: "user_id" #the key to use when sending it to ratalimit

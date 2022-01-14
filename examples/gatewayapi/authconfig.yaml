@@ -1,0 +1,15 @@
+apiVersion: authorino.3scale.net/v1beta1
+kind: AuthConfig
+metadata:
+  name: shop-auth
+spec:
+  hosts:
+  - store.example.com
+  identity:
+  - name: api-clients
+    apiKey:
+      labelSelectors:
+        api: store
+    credentials:
+      in: authorization_header
+      keySelector: APIKEY
