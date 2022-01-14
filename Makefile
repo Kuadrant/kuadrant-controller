@@ -39,7 +39,8 @@ IMAGE_TAG_BASE ?= quay.io/kuadrant/kuadrant-controller
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/kuadrant/kuadrant-controller:latest
+DEFAULT_IMG ?= $(IMAGE_TAG_BASE):latest
+IMG ?= $(DEFAULT_IMG)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22
 
@@ -78,6 +79,15 @@ help: ## Display this help.
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(MAKE) deploy-manifest
+
+.PHONY: deploy-manifest
+deploy-manifest: kustomize ## Generate deployment manifests.
+	mkdir -p $(PROJECT_DIR)/config/deploy
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/default > $(PROJECT_DIR)/config/deploy/manifests.yaml
+	# clean up
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(DEFAULT_IMG)
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
