@@ -6,24 +6,22 @@ metadata:
   labels:
     app: toystore
 spec:
-  phases: ["postAuth"]
-  rules:
-    - uri: /admin/addToy
-      method: POST
+  routes:
+    - name: get-toy
+      stage: BOTH
+      actions:
+        - generic_key:
+            descriptor_key: get
+            descriptor_value: "yes"
+    - name: add-toy
+      stage: POSTAUTH
       actions:
         - generic_key:
             descriptor_key: admin
             descriptor_value: "yes"
-    - uri: /getToy
-      method: GET
-  actions:
-    - generic_key:
-        descriptor_key: admin
-        descriptor_value: "yes"
   limits:
     - conditions: ["admin == yes"]
       max_value: 2
-      namespace: preauth
+      namespace: postauth
       seconds: 15
       variables: []
-

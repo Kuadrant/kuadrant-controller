@@ -33,33 +33,11 @@ type API_Metadata struct {
 	OpenAPIRef  OPARef `json:"openAPIRef,omitempty"`
 }
 
-type Operation_GET struct{}
-
-type Upstream struct {
-	URL         string `json:"url,omitempty"`
-	ServiceName string `json:"serviceName,omitempty"`
-	Namespace   string `json:"namespace,omitempty"`
-	Port        uint32 `json:"port,omitempty"`
-	TLS         string `json:"tls,omitempty"`
-}
-
-type Operation_POST struct {
-	Upstreams []Upstream `json:"upstreams"`
-}
-
-type Operation struct {
-	Get  *Operation_GET  `json:"get,omitempty"`
-	Post *Operation_POST `json:"post,omitempty"`
-}
-
 type APISpec struct {
-	Domains            []string             `json:"domains"`
-	Gateways           []string             `json:"gateways,omitempty"`
-	Info               API_Metadata         `json:"info"`
-	Upstreams          []Upstream           `json:"upstreams"`
-	Paths              map[string]Operation `json:"paths"`
-	AuthConfigSelector map[string]string    `json:"authConfigSelector,omitempty"`
-	RateLimitSelector  *map[string]string   `json:"rateLimitSelector,omitempty"`
+	Info                   API_Metadata      `json:"info"`
+	VirtualServiceSelector map[string]string `json:"virtualServiceSelector,omitempty"`
+	AuthConfigSelector     map[string]string `json:"authConfigSelector,omitempty"`
+	RateLimitSelector      map[string]string `json:"rateLimitSelector,omitempty"`
 }
 
 // +kubebuilder:object:root=true
