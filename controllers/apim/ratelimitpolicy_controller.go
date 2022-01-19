@@ -63,7 +63,7 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 	var rlp apimv1alpha1.RateLimitPolicy
 	if err := r.Client().Get(ctx, req.NamespacedName, &rlp); err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Error(err, "no rate limit policy found.")
+			logger.Info("no rate limit policy found.")
 			return ctrl.Result{}, nil
 		}
 		logger.Error(err, "failed to get RateLimitPolicy")
@@ -131,7 +131,7 @@ func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apim
 			return ctrl.Result{}, err
 		}
 		err := r.BaseReconciler.ReconcileResource(ctx, &v1alpha1.RateLimit{}, ratelimit, alwaysUpdateRateLimit)
-		if err != nil {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			logger.Error(err, "ReconcileResource failed to create/update RateLimit resource")
 			return ctrl.Result{}, err
 		}

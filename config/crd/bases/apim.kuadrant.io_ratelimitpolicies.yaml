@@ -80,11 +80,8 @@ spec:
                   - variables
                   type: object
                 type: array
-              phases:
-                items:
-                  type: string
-                type: array
-              rules:
+              routes:
+                description: route specific staging and actions
                 items:
                   properties:
                     actions:
@@ -105,19 +102,25 @@ spec:
                         - generic_key
                         type: object
                       type: array
-                    method:
+                    name:
+                      description: name of the route present in the virutalservice
                       type: string
-                    uri:
+                    stage:
+                      description: 'Definfing phase at which rate limits will be applied.
+                        Valid values are: PREAUTH, POSTAUTH, BOTH'
+                      enum:
+                      - PREAUTH
+                      - POSTAUTH
+                      - BOTH
                       type: string
                   required:
-                  - method
-                  - uri
+                  - name
+                  - stage
                   type: object
                 type: array
             required:
             - limits
-            - phases
-            - rules
+            - routes
             type: object
         type: object
     served: true

@@ -1,0 +1,30 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: toystore-virtual-service
+  namespace: kuadrant-system
+  labels:
+    app: toystore
+spec:
+  hosts:
+    - "*.toystore.com"
+  gateways:
+    - kuadrant-gateway
+  http:
+    - match:
+        - name: get-toy
+          uri:
+            exact: /getToy
+          method:
+            exact: GET
+        - name: add-toy
+          uri:
+            exact: /admin/addToy
+          method:
+            exact: POST
+      route:
+        - destination:
+            host: toystore.default.svc.cluster.local
+            port:
+              number: 80
+
