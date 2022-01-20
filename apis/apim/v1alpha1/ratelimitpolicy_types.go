@@ -67,10 +67,12 @@ type Route struct {
 // RateLimitPolicySpec defines the desired state of RateLimitPolicy
 type RateLimitPolicySpec struct {
 	// route specific staging and actions
-	Routes []Route `json:"routes"`
+	//+listType=map
+	//+listMapKey=name
+	Routes []Route `json:"routes,omitempty"`
 	// these actions are used for all of the matching rules
 	Actions []*Action_Specifier               `json:"actions,omitempty"`
-	Limits  []limitadorv1alpha1.RateLimitSpec `json:"limits"`
+	Limits  []limitadorv1alpha1.RateLimitSpec `json:"limits,omitempty"`
 }
 
 //+kubebuilder:object:root=true

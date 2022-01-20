@@ -5,6 +5,8 @@ metadata:
   namespace: kuadrant-system
   labels:
     app: toystore
+  annotations:
+    kuadrant.io/virtualservice: toystore-virtual-service
 spec:
   routes:
     - name: get-toy
