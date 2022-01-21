@@ -80,6 +80,21 @@ spec:
                   - variables
                   type: object
                 type: array
+              networkingRef:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    type:
+                      enum:
+                      - HTTPRoute
+                      - VirtualService
+                      type: string
+                  required:
+                  - name
+                  - type
+                  type: object
+                type: array
               routes:
                 description: route specific staging and actions
                 items:

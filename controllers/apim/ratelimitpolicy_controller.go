@@ -45,7 +45,6 @@ const (
 	preAuthRLStage  = 0
 	postAuthRLStage = 1
 
-	RLPAnnotationVSName         = "kuadrant.io/virtualservice"
 	VSAnnotationRateLimitPolicy = "kuadrant.io/ratelimitpolicy"
 
 	DefaultLimitadorClusterName = "outbound|8081||limitador.kuadrant-system.svc.cluster.local"
@@ -105,27 +104,32 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	vsName, ok := rlp.Annotations[RLPAnnotationVSName]
-	if !ok {
-		logger.Info("virtualservice annotation on ratelimitpolicy not found")
-		return ctrl.Result{}, nil
-	}
-	vsNamespacedName := client.ObjectKey{
-		Namespace: rlp.Namespace,
-		Name:      vsName,
-	}
-
-	var vs istio.VirtualService
-	if err := r.Client().Get(ctx, vsNamespacedName, &vs); err != nil {
-		if apierrors.IsNotFound(err) {
-			logger.Info("no virtualservice found", "lookup name", vsNamespacedName.String())
+	for _, networkingRef := range rlp.Spec.NetworkingRef {
+		switch networkingRef.Type {
+		case apimv1alpha1.NetworkingRefType_HR:
+			logger.Info("HTTPRoute is not implemented yet") // TODO(rahulanand16nov)
 			return ctrl.Result{}, nil
-		}
-		logger.Error(err, "failed to get VirutalService")
-		return ctrl.Result{}, err
-	}
-	if err := r.reconcileWithVirtualService(ctx, &vs, &rlp); err != nil {
+		case apimv1alpha1.NetworkingRefType_VS:
+			vsNamespacedName := client.ObjectKey{
+				Namespace: rlp.Namespace,
+				Name:      networkingRef.Name,
+			}
 
+			var vs istio.VirtualService
+			if err := r.Client().Get(ctx, vsNamespacedName, &vs); err != nil {
+				if apierrors.IsNotFound(err) {
+					logger.Info("no virtualservice found", "lookup name", vsNamespacedName.String())
+					return ctrl.Result{}, nil
+				}
+				logger.Error(err, "failed to get VirutalService")
+				return ctrl.Result{}, err
+			}
+
+			if err := r.reconcileWithVirtualService(ctx, &vs, &rlp); err != nil {
+				logger.Error(err, "failed to reconcile with virtualservice")
+				return ctrl.Result{}, err
+			}
+		}
 	}
 	return ctrl.Result{}, nil
 }

@@ -5,9 +5,10 @@ metadata:
   namespace: kuadrant-system
   labels:
     app: toystore
-  annotations:
-    kuadrant.io/virtualservice: toystore-virtual-service
 spec:
+  networkingRef:
+    - type: VirtualService
+      name: toystore-virtual-service
   routes:
     - name: get-toy
       stage: BOTH
