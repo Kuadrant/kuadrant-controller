@@ -34,10 +34,7 @@ type API_Metadata struct {
 }
 
 type APISpec struct {
-	Info                   API_Metadata      `json:"info"`
-	VirtualServiceSelector map[string]string `json:"virtualServiceSelector,omitempty"`
-	AuthConfigSelector     map[string]string `json:"authConfigSelector,omitempty"`
-	RateLimitSelector      map[string]string `json:"rateLimitSelector,omitempty"`
+	Info API_Metadata `json:"info"`
 }
 
 // +kubebuilder:object:root=true

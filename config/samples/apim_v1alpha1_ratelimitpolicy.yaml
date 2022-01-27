@@ -6,6 +6,9 @@ metadata:
   labels:
     app: toystore
 spec:
+  networkingRef:
+    - type: VirtualService
+      name: toystore-virtual-service
   routes:
     - name: get-toy
       stage: BOTH
