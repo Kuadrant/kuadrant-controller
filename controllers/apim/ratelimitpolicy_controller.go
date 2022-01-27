@@ -46,9 +46,6 @@ const (
 	postAuthRLStage = 1
 
 	VSAnnotationRateLimitPolicy = "kuadrant.io/ratelimitpolicy"
-
-	DefaultLimitadorClusterName = "outbound|8081||limitador.kuadrant-system.svc.cluster.local"
-	PatchedLimitadorClusterName = "rate-limit-cluster"
 )
 
 // RateLimitPolicyReconciler reconciles a RateLimitPolicy object
@@ -129,6 +126,10 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 				logger.Error(err, "failed to reconcile with virtualservice")
 				return ctrl.Result{}, err
 			}
+		default:
+			err := fmt.Errorf("unknown networking reference type")
+			logger.Error(err, "networking reconciliation failed")
+			return ctrl.Result{}, err
 		}
 	}
 	return ctrl.Result{}, nil
@@ -246,9 +247,7 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 					"grpc_service": map[string]interface{}{
 						"timeout": "3s",
 						"envoy_grpc": map[string]string{
-							// It should be (outbound|8081||limitador.kuadrant-system.svc.cluster.local) but
-							// limitador rejects request if '|' is present in the cluster name.
-							"cluster_name": PatchedLimitadorClusterName,
+							"cluster_name": istioprovider.PatchedLimitadorClusterName,
 						},
 					},
 				},
@@ -307,29 +306,7 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 	postAuthFilterPatch.Patch = postPatch
 
 	// Eventually, this should be dropped since it's a temp-fix for Kuadrant/limitador#53
-	clusterPatch := networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
-		ApplyTo: networkingv1alpha3.EnvoyFilter_CLUSTER,
-		Match: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
-			Context: networkingv1alpha3.EnvoyFilter_GATEWAY,
-			ObjectTypes: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Cluster{
-				Cluster: &networkingv1alpha3.EnvoyFilter_ClusterMatch{
-					Name: DefaultLimitadorClusterName,
-				},
-			},
-		},
-		Patch: &networkingv1alpha3.EnvoyFilter_Patch{
-			Operation: networkingv1alpha3.EnvoyFilter_Patch_MERGE,
-			Value: &types.Struct{
-				Fields: map[string]*types.Value{
-					"name": {
-						Kind: &types.Value_StringValue{
-							StringValue: PatchedLimitadorClusterName,
-						},
-					},
-				},
-			},
-		},
-	}
+	clusterPatch := istioprovider.ClusterEnvoyPatch()
 
 	factory := istioprovider.EnvoyFilterFactory{
 		ObjectName: gateway.Name + "-ratelimit-filters",
@@ -338,7 +315,7 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 			// Ordering matters here!
 			&preAuthFilterPatch,
 			&postAuthFilterPatch,
-			&clusterPatch,
+			clusterPatch,
 		},
 	}
 
