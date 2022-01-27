@@ -35,10 +35,6 @@ spec:
             type: object
           spec:
             properties:
-              authConfigSelector:
-                additionalProperties:
-                  type: string
-                type: object
               info:
                 properties:
                   description:
@@ -65,14 +61,6 @@ spec:
                 required:
                 - title
                 - version
-                type: object
-              rateLimitSelector:
-                additionalProperties:
-                  type: string
-                type: object
-              virtualServiceSelector:
-                additionalProperties:
-                  type: string
                 type: object
             required:
             - info

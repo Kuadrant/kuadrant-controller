@@ -37,6 +37,8 @@ type HTTPFilterStage uint32
 const (
 	PreAuthStage HTTPFilterStage = iota
 	PostAuthStage
+
+	PatchedLimitadorClusterName = "rate-limit-cluster"
 )
 
 func (is *IstioProvider) reconcileRateLimit(ctx context.Context, apip *networkingv1beta1.APIProduct) error {
@@ -74,7 +76,7 @@ func clusterEnvoyFilter(apip *networkingv1beta1.APIProduct) *istionetworkingv1al
 		return envoyFilter
 	}
 
-	factory.Patches = append(factory.Patches, clusterEnvoyPatch())
+	factory.Patches = append(factory.Patches, ClusterEnvoyPatch())
 	return factory.EnvoyFilter()
 }
 
@@ -362,19 +364,19 @@ func postAuthHTTPFilterEnvoyPatch(apip *networkingv1beta1.APIProduct) *istioapiv
 	}
 }
 
-func clusterEnvoyPatch() *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+func ClusterEnvoyPatch() *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
 	// The patch defines the rate_limit_cluster, which provides the endpoint location of the external rate limit service.
 
 	patchUnstructured := map[string]interface{}{
 		"operation": "ADD",
 		"value": map[string]interface{}{
-			"name":                   "rate_limit_cluster",
+			"name":                   PatchedLimitadorClusterName,
 			"type":                   "STRICT_DNS",
 			"connect_timeout":        "1s",
 			"lb_policy":              "ROUND_ROBIN",
 			"http2_protocol_options": map[string]interface{}{},
 			"load_assignment": map[string]interface{}{
-				"cluster_name": "rate_limit_cluster",
+				"cluster_name": PatchedLimitadorClusterName,
 				"endpoints": []map[string]interface{}{
 					{
 						"lb_endpoints": []map[string]interface{}{

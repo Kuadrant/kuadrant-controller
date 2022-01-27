@@ -80,6 +80,21 @@ spec:
                   - variables
                   type: object
                 type: array
+              networkingRef:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    type:
+                      enum:
+                      - HTTPRoute
+                      - VirtualService
+                      type: string
+                  required:
+                  - name
+                  - type
+                  type: object
+                type: array
               routes:
                 description: route specific staging and actions
                 items:
@@ -118,9 +133,9 @@ spec:
                   - stage
                   type: object
                 type: array
-            required:
-            - limits
-            - routes
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
             type: object
         type: object
     served: true
