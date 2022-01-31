@@ -13,9 +13,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	networkingv1alpha3 "istio.io/api/networking/v1alpha3"
 	securityv1beta1 "istio.io/api/security/v1beta1"
@@ -50,6 +47,31 @@ func (r *VirtualServiceReconciler) Reconcile(eventCtx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
+	// check if this virtualservice is to be protected or not.
+	_, present := virtualService.GetAnnotations()[KuadrantAuthProviderAnnotation]
+	if !present {
+		authObjKey := types.NamespacedName{
+			Name:      getAuthPolicyName(virtualService.GetName()),
+			Namespace: virtualService.GetNamespace(),
+		}
+
+		authPolicy := istiosecurityv1beta1.AuthorizationPolicy{}
+		if err := r.Client().Get(context.Background(), authObjKey, &authPolicy); err != nil {
+			// no annotation but authpolicy exist means annotation was removed.
+			if !apierrors.IsNotFound(err) {
+				logger.Error(err, "failed to check AuthorizationPolicy existence")
+			}
+			return ctrl.Result{}, nil // this virtualservice is not protected.
+		}
+
+		// Orphan AuthorizationPolicy exists
+		if err := r.DeleteResource(context.Background(), &authPolicy); err != nil {
+			logger.Error(err, "failed to delete orphan authorizationpolicy")
+			return ctrl.Result{}, err
+		}
+	}
+
+	// reconcile authpolicy for the protected virtualservice
 	if err := r.reconcileAuthPolicy(ctx, &virtualService); err != nil {
 		logger.Error(err, "failed to reconcile AuthorizationPolicy")
 		return ctrl.Result{}, err
@@ -74,11 +96,8 @@ func (r *VirtualServiceReconciler) reconcileAuthPolicy(ctx context.Context, vs *
 		},
 	}
 
-	providerName, present := vs.GetAnnotations()[KuadrantAuthProviderAnnotation]
-	if !present {
-		logger.V(1).Info("Kuadrant auth-provider annotation not found")
-		return nil
-	}
+	// annotation presence is already checked.
+	providerName, _ := vs.GetAnnotations()[KuadrantAuthProviderAnnotation]
 
 	// fill out the rules
 	authToRules := []*securityv1beta1.Rule_To{}
@@ -161,58 +180,11 @@ func normalizeStringMatch(sm *networkingv1alpha3.StringMatch) string {
 	return ""
 }
 
-// VirtualServiceFilter allows generation of only relevant reconciliation request.
-type VirtualServiceFilter struct {
-	K8sClient client.Client
-	Logger    logr.Logger
-}
-
-// Map contains filtering logic for virtualservice.
-func (m *VirtualServiceFilter) Map(obj client.Object) []reconcile.Request {
-	virtualServiceAnnotations := obj.GetAnnotations()
-	_, present := virtualServiceAnnotations[KuadrantAuthProviderAnnotation]
-	if !present {
-		authObjKey := types.NamespacedName{
-			Name:      getAuthPolicyName(obj.GetName()),
-			Namespace: obj.GetNamespace(),
-		}
-
-		var authPolicy client.Object
-		if err := m.K8sClient.Get(context.Background(), authObjKey, authPolicy); err != nil {
-			// no annotation but authpolicy exist means annotation was removed
-			if !apierrors.IsNotFound(err) {
-				m.Logger.Error(err, "failed to check AuthorizationPolicy existence")
-			}
-			return nil // this virtualservice is not protected
-		}
-
-		// AuthorizationPolicy exists
-		if err := m.K8sClient.Delete(context.Background(), authPolicy); err != nil {
-			m.Logger.Error(err, "failed to delete orphan authorizationpolicy")
-		}
-		return nil
-	}
-
-	return []reconcile.Request{
-		{NamespacedName: types.NamespacedName{
-			Name:      obj.GetName(),
-			Namespace: obj.GetNamespace(),
-		}},
-	}
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *VirtualServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	virtualServiceFilter := VirtualServiceFilter{
-		K8sClient: r.Client(),
-		Logger:    r.Logger().WithName("AuthPolicyHandler"),
-	}
 	return ctrl.NewControllerManagedBy(mgr).
-		Watches(
-			&source.Kind{Type: &istionetworkingv1alpha3.VirtualService{}},
-			handler.EnqueueRequestsFromMapFunc(virtualServiceFilter.Map),
-		).
-		For(&istiosecurityv1beta1.AuthorizationPolicy{}).
+		For(&istionetworkingv1alpha3.VirtualService{}).
+		Owns(&istiosecurityv1beta1.AuthorizationPolicy{}).
 		WithLogger(log.Log). // use base logger, the manager will add prefixes for watched sources
 		Complete(r)
 }
