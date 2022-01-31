@@ -54,6 +54,7 @@ func (r *VirtualServiceReconciler) Reconcile(eventCtx context.Context, req ctrl.
 		logger.Error(err, "failed to reconcile AuthorizationPolicy")
 		return ctrl.Result{}, err
 	}
+	logger.Info("successfully reconciled AuthorizationPolicy")
 
 	return ctrl.Result{}, nil
 }
@@ -75,7 +76,8 @@ func (r *VirtualServiceReconciler) reconcileAuthPolicy(ctx context.Context, vs *
 
 	providerName, present := vs.GetAnnotations()[KuadrantAuthProviderAnnotation]
 	if !present {
-		return fmt.Errorf("Kuadrant auth-provider annotation not found")
+		logger.V(1).Info("Kuadrant auth-provider annotation not found")
+		return nil
 	}
 
 	// fill out the rules
@@ -130,7 +132,7 @@ func (r *VirtualServiceReconciler) reconcileAuthPolicy(ctx context.Context, vs *
 		return err
 	}
 
-	logger.Info("successfully created/updated AuthorizationPolicy resources")
+	logger.Info("successfully created/updated AuthorizationPolicy resource(s)")
 	return nil
 }
 
