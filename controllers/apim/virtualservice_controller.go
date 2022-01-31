@@ -65,14 +65,15 @@ func (r *VirtualServiceReconciler) Reconcile(eventCtx context.Context, req ctrl.
 		}
 
 		// Orphan AuthorizationPolicy exists
-		if err := r.DeleteResource(context.Background(), &authPolicy); err != nil {
+		if err := r.Client().Delete(context.Background(), &authPolicy); err != nil {
 			logger.Error(err, "failed to delete orphan authorizationpolicy")
 			return ctrl.Result{}, err
 		}
+		return ctrl.Result{}, nil
 	}
 
 	// reconcile authpolicy for the protected virtualservice
-	if err := r.reconcileAuthPolicy(ctx, &virtualService); err != nil {
+	if err := r.reconcileAuthPolicy(logger, ctx, &virtualService); err != nil {
 		logger.Error(err, "failed to reconcile AuthorizationPolicy")
 		return ctrl.Result{}, err
 	}
@@ -85,8 +86,7 @@ func getAuthPolicyName(vsName string) string {
 	return "source-virtualservice-" + vsName
 }
 
-func (r *VirtualServiceReconciler) reconcileAuthPolicy(ctx context.Context, vs *istionetworkingv1alpha3.VirtualService) error {
-	logger := r.Logger()
+func (r *VirtualServiceReconciler) reconcileAuthPolicy(logger logr.Logger, ctx context.Context, vs *istionetworkingv1alpha3.VirtualService) error {
 	logger.Info("Reconciling AuthorizationPolicy")
 
 	authPolicy := istiosecurityv1beta1.AuthorizationPolicy{
