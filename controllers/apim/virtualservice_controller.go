@@ -11,8 +11,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	networkingv1alpha3 "istio.io/api/networking/v1alpha3"
 	securityv1beta1 "istio.io/api/security/v1beta1"
@@ -183,8 +186,29 @@ func normalizeStringMatch(sm *networkingv1alpha3.StringMatch) string {
 // SetupWithManager sets up the controller with the Manager.
 func (r *VirtualServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&istionetworkingv1alpha3.VirtualService{}).
+		For(&istionetworkingv1alpha3.VirtualService{}, builder.WithPredicates(virtualServicePredicate())).
 		Owns(&istiosecurityv1beta1.AuthorizationPolicy{}).
 		WithLogger(log.Log). // use base logger, the manager will add prefixes for watched sources
 		Complete(r)
+}
+
+func virtualServicePredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			_, present := e.Object.GetAnnotations()[KuadrantAuthProviderAnnotation]
+			return present
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			if _, present := e.ObjectOld.GetAnnotations()[KuadrantAuthProviderAnnotation]; present {
+				return true
+			}
+			_, present := e.ObjectNew.GetAnnotations()[KuadrantAuthProviderAnnotation]
+			return present
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			// If the object had the Kuadrant label, we need to handle its deletion
+			_, present := e.Object.GetAnnotations()[KuadrantAuthProviderAnnotation]
+			return present
+		},
+	}
 }
