@@ -45,6 +45,9 @@ const (
 	preAuthRLStage  = 0
 	postAuthRLStage = 1
 
+	EnvoysHTTPPortNumber            = 8080
+	EnvoysHTTPConnectionManagerName = "envoy.filters.network.http_connection_manager"
+
 	VSAnnotationRateLimitPolicy = "kuadrant.io/ratelimitpolicy"
 )
 
@@ -226,14 +229,14 @@ func gatewayNameToObjectKey(gatewayName, defaultNamespace string) client.ObjectK
 }
 
 // rateLimitInitialPatch returns EnvoyFilter resource that patches-in
-// - Add Preauth RateLimit Filter
-// - Add PostAuth RateLimit Filter
+// - Add Preauth RateLimit Filter as the first http filter
+// - Add PostAuth RateLimit Filter as the last http filter
 // - Change cluster name pointing to Limitador in kuadrant-system namespace (temp)
 // Note please make sure this patch is only created once per gateway.
 func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 
 	patchUnstructured := map[string]interface{}{
-		"operation": "INSERT_BEFORE",
+		"operation": "INSERT_FIRST", // preauth should be the first filter in the chain
 		"value": map[string]interface{}{
 			"name": "envoy.filters.http.preauth.ratelimit",
 			"typed_config": map[string]interface{}{
@@ -268,32 +271,32 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 			StringValue: "envoy.filters.http.postauth.ratelimit",
 		},
 	}
-	// update domain
+
+	// update domain for postauth filter
 	postPatch.Value.Fields["typed_config"].GetStructValue().Fields["domain"] = &types.Value{
 		Kind: &types.Value_StringValue{
 			StringValue: "postauth",
 		},
 	}
-	// update stage
+	// update stage for postauth filter
 	postPatch.Value.Fields["typed_config"].GetStructValue().Fields["stage"] = &types.Value{
 		Kind: &types.Value_NumberValue{
 			NumberValue: postAuthRLStage,
 		},
 	}
+	// update operation for postauth filter
+	postPatch.Operation = networkingv1alpha3.EnvoyFilter_Patch_INSERT_BEFORE
 
-	preAuthFilterPatch := networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
+	preAuthFilterPatch := &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: networkingv1alpha3.EnvoyFilter_HTTP_FILTER,
 		Match: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
 			Context: networkingv1alpha3.EnvoyFilter_GATEWAY,
 			ObjectTypes: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
 				Listener: &networkingv1alpha3.EnvoyFilter_ListenerMatch{
-					PortNumber: 8080, // Kuadrant-gateway listens on this port by default
+					PortNumber: EnvoysHTTPPortNumber, // Kuadrant-gateway listens on this port by default
 					FilterChain: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
 						Filter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
-							Name: "envoy.filters.network.http_connection_manager",
-							SubFilter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_SubFilterMatch{
-								Name: "envoy.filters.http.router",
-							},
+							Name: EnvoysHTTPConnectionManagerName,
 						},
 					},
 				},
@@ -302,8 +305,23 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 		Patch: &prePatch,
 	}
 
-	postAuthFilterPatch := preAuthFilterPatch
+	postAuthFilterPatch := preAuthFilterPatch.DeepCopy()
 	postAuthFilterPatch.Patch = postPatch
+
+	// postauth filter should be injected just before the router filter
+	postAuthFilterPatch.Match.ObjectTypes = &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
+		Listener: &networkingv1alpha3.EnvoyFilter_ListenerMatch{
+			PortNumber: EnvoysHTTPPortNumber,
+			FilterChain: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
+				Filter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
+					Name: EnvoysHTTPConnectionManagerName,
+					SubFilter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_SubFilterMatch{
+						Name: "envoy.filters.http.router",
+					},
+				},
+			},
+		},
+	}
 
 	// Eventually, this should be dropped since it's a temp-fix for Kuadrant/limitador#53
 	clusterPatch := istioprovider.ClusterEnvoyPatch()
@@ -313,8 +331,8 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 		Namespace:  gateway.Namespace,
 		Patches: []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 			// Ordering matters here!
-			&preAuthFilterPatch,
-			&postAuthFilterPatch,
+			preAuthFilterPatch,
+			postAuthFilterPatch,
 			clusterPatch,
 		},
 	}

@@ -8,7 +8,7 @@ metadata:
 spec:
   networkingRef:
     - type: VirtualService
-      name: toystore-virtual-service
+      name: toystore
   routes:
     - name: get-toy
       stage: BOTH
