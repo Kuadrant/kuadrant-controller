@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"fmt"
 	"os"
 )
 
@@ -24,6 +25,11 @@ import (
 const (
 	KuadrantNamespace             = "kuadrant-system"
 	KuadrantAuthorizationProvider = "kuadrant-authorization"
+	LimitadorServiceGrpcPort      = 8081
+)
+
+var (
+	LimitadorServiceClusterHost = fmt.Sprintf("limitador.%s.svc.cluster.local", KuadrantNamespace)
 )
 
 func FetchEnv(key string, def string) string {

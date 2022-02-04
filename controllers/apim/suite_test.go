@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 /*
 Copyright 2021 Red Hat, Inc.
 
@@ -17,6 +20,7 @@ limitations under the License.
 package apim
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -27,10 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
+	"github.com/kuadrant/kuadrant-controller/pkg/log"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -50,8 +53,6 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
@@ -78,3 +79,13 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func TestMain(m *testing.M) {
+	logger := log.NewLogger(
+		log.SetLevel(log.DebugLevel),
+		log.SetMode(log.ModeDev),
+		log.WriteTo(GinkgoWriter),
+	).WithName("controller_test")
+	log.SetLogger(logger)
+	os.Exit(m.Run())
+}

@@ -22,28 +22,24 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-logr/logr"
+	"github.com/gogo/protobuf/types"
+	"github.com/kuadrant/limitador-operator/api/v1alpha1"
+	networkingv1alpha3 "istio.io/api/networking/v1alpha3"
+	istio "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/go-logr/logr"
-	"github.com/gogo/protobuf/types"
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
-	"github.com/kuadrant/kuadrant-controller/pkg/ingressproviders/istioprovider"
-	limitador "github.com/kuadrant/kuadrant-controller/pkg/ratelimitproviders/limitador"
+	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
-	"github.com/kuadrant/limitador-operator/api/v1alpha1"
-	networkingv1alpha3 "istio.io/api/networking/v1alpha3"
-	istio "istio.io/client-go/pkg/apis/networking/v1alpha3"
 )
 
 const (
 	finalizerName = "kuadrant.io/ratelimitpolicy"
-
-	preAuthRLStage  = 0
-	postAuthRLStage = 1
 
 	EnvoysHTTPPortNumber            = 8080
 	EnvoysHTTPConnectionManagerName = "envoy.filters.network.http_connection_manager"
@@ -242,7 +238,7 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 			"typed_config": map[string]interface{}{
 				"@type":             "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit",
 				"domain":            "preauth",
-				"stage":             preAuthRLStage,
+				"stage":             common.PreAuthStage,
 				"failure_mode_deny": true,
 				// If not specified, returns success immediately (can be useful for us)
 				"rate_limit_service": map[string]interface{}{
@@ -250,7 +246,7 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 					"grpc_service": map[string]interface{}{
 						"timeout": "3s",
 						"envoy_grpc": map[string]string{
-							"cluster_name": istioprovider.PatchedLimitadorClusterName,
+							"cluster_name": common.PatchedLimitadorClusterName,
 						},
 					},
 				},
@@ -281,7 +277,7 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 	// update stage for postauth filter
 	postPatch.Value.Fields["typed_config"].GetStructValue().Fields["stage"] = &types.Value{
 		Kind: &types.Value_NumberValue{
-			NumberValue: postAuthRLStage,
+			NumberValue: float64(common.PostAuthStage),
 		},
 	}
 	// update operation for postauth filter
@@ -324,9 +320,9 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 	}
 
 	// Eventually, this should be dropped since it's a temp-fix for Kuadrant/limitador#53
-	clusterPatch := istioprovider.ClusterEnvoyPatch()
+	clusterPatch := common.LimitadorClusterEnvoyPatch()
 
-	factory := istioprovider.EnvoyFilterFactory{
+	factory := common.EnvoyFilterFactory{
 		ObjectName: gateway.Name + "-ratelimit-filters",
 		Namespace:  gateway.Namespace,
 		Patches: []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
@@ -410,7 +406,7 @@ func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.A
 	// Need to make this unique among all the patches even if multi vhost with same
 	// route name is present.
 	objectName := "rate-limits-" + strings.ToLower(strings.Replace(routeName, "/", "-", -1))
-	factory := istioprovider.EnvoyFilterFactory{
+	factory := common.EnvoyFilterFactory{
 		ObjectName: objectName,
 		Namespace:  "kuadrant-system",
 		Patches: []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
@@ -451,7 +447,7 @@ func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *ap
 
 	// create the RateLimit resource
 	for i, rlSpec := range rlp.Spec.Limits {
-		ratelimitfactory := limitador.RateLimitFactory{
+		ratelimitfactory := common.RateLimitFactory{
 			Key: client.ObjectKey{
 				Name:      fmt.Sprintf("%s-limit-%d", rlp.Name, i+1),
 				Namespace: rlp.Namespace,
