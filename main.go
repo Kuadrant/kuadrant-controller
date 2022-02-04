@@ -35,14 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
-	networkingv1beta1 "github.com/kuadrant/kuadrant-controller/apis/networking/v1beta1"
-	"github.com/kuadrant/kuadrant-controller/controllers"
 	apimcontrollers "github.com/kuadrant/kuadrant-controller/controllers/apim"
-	"github.com/kuadrant/kuadrant-controller/pkg/authproviders"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
-	"github.com/kuadrant/kuadrant-controller/pkg/ingressproviders"
 	"github.com/kuadrant/kuadrant-controller/pkg/log"
-	"github.com/kuadrant/kuadrant-controller/pkg/ratelimitproviders"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 	"github.com/kuadrant/kuadrant-controller/version"
 	// +kubebuilder:scaffold:imports
@@ -56,7 +51,6 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(networkingv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(apimv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
@@ -104,35 +98,6 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	apiProductBaseReconciler := reconcilers.NewBaseReconciler(
-		mgr.GetClient(), mgr.GetScheme(), mgr.GetAPIReader(),
-		log.Log.WithName("apiproduct"),
-		mgr.GetEventRecorderFor("APIProduct"),
-	)
-
-	serviceBaseReconciler := reconcilers.NewBaseReconciler(
-		mgr.GetClient(), mgr.GetScheme(), mgr.GetAPIReader(),
-		log.Log.WithName("service"),
-		mgr.GetEventRecorderFor("Service"),
-	)
-
-	if err = (&controllers.APIProductReconciler{
-		BaseReconciler:    apiProductBaseReconciler,
-		AuthProvider:      authproviders.GetAuthProvider(apiProductBaseReconciler),
-		IngressProvider:   ingressproviders.GetIngressProvider(apiProductBaseReconciler),
-		RateLimitProvider: ratelimitproviders.GetRateLimitProvider(apiProductBaseReconciler),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "APIProduct")
-		os.Exit(1)
-	}
-
-	if err = (&controllers.ServiceReconciler{
-		BaseReconciler: serviceBaseReconciler,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
 	}
 
