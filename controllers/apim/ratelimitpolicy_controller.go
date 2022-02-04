@@ -41,9 +41,6 @@ import (
 const (
 	finalizerName = "kuadrant.io/ratelimitpolicy"
 
-	preAuthRLStage  = 0
-	postAuthRLStage = 1
-
 	EnvoysHTTPPortNumber            = 8080
 	EnvoysHTTPConnectionManagerName = "envoy.filters.network.http_connection_manager"
 
@@ -241,7 +238,7 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 			"typed_config": map[string]interface{}{
 				"@type":             "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit",
 				"domain":            "preauth",
-				"stage":             preAuthRLStage,
+				"stage":             common.PreAuthStage,
 				"failure_mode_deny": true,
 				// If not specified, returns success immediately (can be useful for us)
 				"rate_limit_service": map[string]interface{}{
@@ -280,7 +277,7 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 	// update stage for postauth filter
 	postPatch.Value.Fields["typed_config"].GetStructValue().Fields["stage"] = &types.Value{
 		Kind: &types.Value_NumberValue{
-			NumberValue: postAuthRLStage,
+			NumberValue: float64(common.PostAuthStage),
 		},
 	}
 	// update operation for postauth filter
