@@ -40,6 +40,9 @@ import (
 	"github.com/kuadrant/kuadrant-controller/pkg/log"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 	"github.com/kuadrant/kuadrant-controller/version"
+	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
+	istionetworkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
+	istiosecurityv1beta1 "istio.io/client-go/pkg/apis/security/v1beta1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -53,6 +56,9 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(apimv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(istionetworkingv1alpha3.AddToScheme(scheme))
+	utilruntime.Must(istiosecurityv1beta1.AddToScheme(scheme))
+	utilruntime.Must(limitadorv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	logger := log.NewLogger(

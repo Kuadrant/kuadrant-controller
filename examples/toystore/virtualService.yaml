@@ -2,14 +2,13 @@ apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
   name: toystore
-  namespace: kuadrant-system
   labels:
     app: toystore
 spec:
   hosts:
     - "*.toystore.com"
   gateways:
-    - kuadrant-gateway
+    - kuadrant-system/kuadrant-gateway
   http:
     - match:
         - name: get-toy

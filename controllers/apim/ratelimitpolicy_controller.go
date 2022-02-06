@@ -28,6 +28,7 @@ import (
 	networkingv1alpha3 "istio.io/api/networking/v1alpha3"
 	istio "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,12 +40,12 @@ import (
 )
 
 const (
-	finalizerName = "kuadrant.io/ratelimitpolicy"
-
 	EnvoysHTTPPortNumber            = 8080
 	EnvoysHTTPConnectionManagerName = "envoy.filters.network.http_connection_manager"
 
 	VSAnnotationRateLimitPolicy = "kuadrant.io/ratelimitpolicy"
+
+	InvalidNetworkingRefTypeErr = "unknown networking reference type"
 )
 
 // RateLimitPolicyReconciler reconciles a RateLimitPolicy object
@@ -56,6 +57,9 @@ type RateLimitPolicyReconciler struct {
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=ratelimitpolicies,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=ratelimitpolicies/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=ratelimitpolicies/finalizers,verbs=update
+//+kubebuilder:rbac:groups=networking.istio.io,resources=gateways,verbs=get;list;watch
+//+kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;delete;update;patch
+//+kubebuilder:rbac:groups=limitador.kuadrant.io,resources=ratelimits,verbs=get;list;watch;create;update;delete;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -74,23 +78,28 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 	var rlp apimv1alpha1.RateLimitPolicy
 	if err := r.Client().Get(ctx, req.NamespacedName, &rlp); err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("no rate limit policy found.")
+			logger.Info("no RateLimitPolicy found")
 			return ctrl.Result{}, nil
 		}
 		logger.Error(err, "failed to get RateLimitPolicy")
 		return ctrl.Result{}, err
 	}
 
-	if rlp.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&rlp, finalizerName) {
-		controllerutil.RemoveFinalizer(&rlp, finalizerName)
+	if rlp.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&rlp, filtersFinalizer) {
+		logger.Info("Removing finalizers")
+		if err := r.finalizeEnvoyFilters(ctx, &rlp); err != nil {
+			logger.Error(err, "failed to remove ownerRlp entry from filters patch")
+			return ctrl.Result{}, err
+		}
+		controllerutil.RemoveFinalizer(&rlp, filtersFinalizer)
 		if err := r.BaseReconciler.UpdateResource(ctx, &rlp); client.IgnoreNotFound(err) != nil {
-			return ctrl.Result{Requeue: true}, err
+			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 
-	if !controllerutil.ContainsFinalizer(&rlp, finalizerName) {
-		controllerutil.AddFinalizer(&rlp, finalizerName)
+	if !controllerutil.ContainsFinalizer(&rlp, filtersFinalizer) {
+		controllerutil.AddFinalizer(&rlp, filtersFinalizer)
 		if err := r.BaseReconciler.UpdateResource(ctx, &rlp); client.IgnoreNotFound(err) != nil {
 			return ctrl.Result{Requeue: true}, err
 		}
@@ -107,14 +116,14 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 			return ctrl.Result{}, nil
 		case apimv1alpha1.NetworkingRefType_VS:
 			vsNamespacedName := client.ObjectKey{
-				Namespace: rlp.Namespace,
+				Namespace: rlp.Namespace, // VirtualService lookup is limited to RLP's namespace
 				Name:      networkingRef.Name,
 			}
 
 			var vs istio.VirtualService
 			if err := r.Client().Get(ctx, vsNamespacedName, &vs); err != nil {
 				if apierrors.IsNotFound(err) {
-					logger.Info("no virtualservice found", "lookup name", vsNamespacedName.String())
+					logger.Info("no VirtualService found", "lookup name", vsNamespacedName.String())
 					return ctrl.Result{}, nil
 				}
 				logger.Error(err, "failed to get VirutalService")
@@ -122,11 +131,11 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 			}
 
 			if err := r.reconcileWithVirtualService(ctx, &vs, &rlp); err != nil {
-				logger.Error(err, "failed to reconcile with virtualservice")
+				logger.Error(err, "failed to reconcile with VirtualService")
 				return ctrl.Result{}, err
 			}
 		default:
-			err := fmt.Errorf("unknown networking reference type")
+			err := fmt.Errorf(InvalidNetworkingRefTypeErr)
 			logger.Error(err, "networking reconciliation failed")
 			return ctrl.Result{}, err
 		}
@@ -136,100 +145,113 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 
 func (r *RateLimitPolicyReconciler) reconcileWithVirtualService(ctx context.Context, vs *istio.VirtualService, rlp *apimv1alpha1.RateLimitPolicy) error {
 	logger := r.Logger()
+	rlpKey := client.ObjectKeyFromObject(rlp)
 
 	_, ok := vs.Annotations[VSAnnotationRateLimitPolicy]
 	if !ok {
-		rlpNamespacedName := client.ObjectKeyFromObject(rlp)
-		vs.Annotations[VSAnnotationRateLimitPolicy] = rlpNamespacedName.String()
+		vs.Annotations[VSAnnotationRateLimitPolicy] = rlpKey.String()
 		if err := r.Client().Update(ctx, vs); err != nil {
-			logger.Error(err, "failed to add ratelimitpolicy annotation to virtualservice")
+			logger.Error(err, "failed to add RateLimitPolicy annotation to VirtualService")
 			return err
 		}
-		logger.V(1).Info("successfully added ratelimitpolicy annotation to virtualservice")
+		logger.V(1).Info("successfully added RateLimitPolicy annotation to VirtualService")
 	}
 
 	// TODO(rahulanand16nov): store context of virtualservice in RLP's status block and manage envoy patches.
-	if err := r.reconcileRateLimitFilters(ctx, vs, rlp); err != nil {
-		logger.Error(err, "failed to reconcile ratelimit filters")
-		return err
-	}
 
-	if err := r.reconcileRateLimitActions(ctx, vs, rlp); err != nil {
-		return err
-	}
-	logger.Info("successfully reconciled ratelimitpolicy using attached virtualservice")
-	return nil
-}
+	// create/update EnvoyFilter patches for each gateway
+	for _, gw := range vs.Spec.Gateways {
+		gwKey := common.NamespacedNameToObjectKey(gw, vs.Namespace) // Istio defaults to VirtualService's namespace
+		gwLabels := gatewayLabels(ctx, r.Client(), gwKey)
+		owner := rlpKey.String()
 
-func (r *RateLimitPolicyReconciler) reconcileRateLimitActions(ctx context.Context, vs *istio.VirtualService, rlp *apimv1alpha1.RateLimitPolicy) error {
-	logger := r.Logger()
-
-	// TODO(rahulanand16nov): right now patch only applies to kuadrant-gateway but ideally should choose from virtualservice.
-	for _, host := range vs.Spec.Hosts {
-		for _, route := range rlp.Spec.Routes {
-			isRouteMatch := doesRouteMatch(vs.Spec.Http, route.Name)
-			if !isRouteMatch {
-				logger.V(1).Info("no match found for route", "route name", route.Name)
-				continue
-			}
-
-			vHostName := host + ":80" // Istio names virtual host in this format: host + port
-			routePatch := routeRateLimitsPatch(vHostName, route.Name, route.Actions, route.Stage)
-
-			if err := controllerutil.SetOwnerReference(rlp, routePatch, r.Client().Scheme()); err != nil {
-				logger.Error(err, "failed to add owner ref to route-level ratelimits patch")
+		// create/update ratelimit filters patch
+		// fetch already existing filters patch or create a new one
+		filtersPatckKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: rlFiltersPatchName(gwKey.Name)}
+		filtersPatch := &istio.EnvoyFilter{}
+		if err := r.Client().Get(ctx, filtersPatckKey, filtersPatch); err != nil {
+			if !apierrors.IsNotFound(err) {
+				logger.Error(err, "failed to get ratelimit filters patch")
 				return err
 			}
-			if err := r.Client().Create(ctx, routePatch); err != nil {
-				if !apierrors.IsAlreadyExists(err) {
-					logger.Error(err, "failed to create route specific rate limit patch %s", routePatch.Name)
-					return err
-				}
+			filtersPatch, err = ratelimitFiltersPatch(gwKey, gwLabels)
+			if err != nil {
+				logger.Error(err, "failed to form ratelimit filters patch")
+				return err
 			}
-			logger.Info("created route level ratelimits patch", "name", routePatch.Name)
 		}
-	}
-	return nil
-}
 
-func (r *RateLimitPolicyReconciler) reconcileRateLimitFilters(ctx context.Context, vs *istio.VirtualService, rlp *apimv1alpha1.RateLimitPolicy) error {
-	logger := r.Logger()
+		// make sure annotation map is initialized
+		filtersPatchOwnerList := []string{}
+		if filtersPatch.Annotations == nil {
+			filtersPatch.Annotations = make(map[string]string)
+		}
 
-	for _, gw := range vs.Spec.Gateways {
-		gwKey := gatewayNameToObjectKey(gw, vs.Namespace) // Istio defaults to vs namespace
-		rateLimitPatch := rateLimitInitialPatch(gwKey)
+		if ogOwnerRlps, present := filtersPatch.Annotations[envoyFilterAnnotationOwnerRLPs]; present {
+			filtersPatchOwnerList = strings.Split(ogOwnerRlps, ownerRlpSeparator)
+		}
 
-		if err := controllerutil.SetOwnerReference(rlp, rateLimitPatch, r.Client().Scheme()); err != nil {
-			logger.Error(err, "failed to add owner ref to RateLimit filters patch")
+		// add the owner name if not present already
+		if !common.Contains(filtersPatchOwnerList, owner) {
+			filtersPatchOwnerList = append(filtersPatchOwnerList, owner)
+		}
+		finalOwnerVal := strings.Join(filtersPatchOwnerList, ownerRlpSeparator)
+
+		filtersPatch.Annotations[envoyFilterAnnotationOwnerRLPs] = finalOwnerVal
+		if err := r.ReconcileResource(ctx, &istio.EnvoyFilter{}, filtersPatch, alwaysUpdateEnvoyPatches); err != nil {
+			logger.Error(err, "failed to create/update EnvoyFilter that patches-in ratelimit filters")
 			return err
 		}
-		if err := r.Client().Create(ctx, rateLimitPatch); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				logger.Error(err, "failed to patch-in RateLimit filters")
+		logger.Info("successfully created/updated ratelimit filters patch", "gateway", gwKey.String())
+
+		// create/update ratelimits patch
+		ratelimitsPatchKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: ratelimitsPatchName(rlp.Name, gwKey.Name)}
+		ratelimitsPatch := &istio.EnvoyFilter{}
+		if err := r.Client().Get(ctx, ratelimitsPatchKey, ratelimitsPatch); err != nil {
+			if !apierrors.IsNotFound(err) {
+				logger.Error(err, "failed to get ratelimits patch")
+				return err
+			}
+			ratelimitsPatch, err = envoyRatelimitsPatch(rlp, vs.Spec.Hosts, gwKey, gwLabels)
+			if err != nil {
+				logger.Error(err, "failed to form ratelimits patch")
 				return err
 			}
 		}
-		logger.Info("created RateLimit filters patch", "gateway", gwKey.String())
-	}
-	logger.Info("successfully reconciled ratelimit filters")
-	return nil
-}
 
-// gatewayNameToObjectKey converts <namespace/name> format string to k8 object key
-func gatewayNameToObjectKey(gatewayName, defaultNamespace string) client.ObjectKey {
-	split := strings.Split(gatewayName, "/")
-	if len(split) == 2 {
-		return client.ObjectKey{Name: split[1], Namespace: split[0]}
+		ratelimitsPatchOwnerList := []string{}
+		if ratelimitsPatch.Annotations == nil {
+			ratelimitsPatch.Annotations = make(map[string]string)
+		}
+
+		if ogOwnerRlps, present := ratelimitsPatch.Annotations[envoyFilterAnnotationOwnerRLPs]; present {
+			ratelimitsPatchOwnerList = strings.Split(ogOwnerRlps, ownerRlpSeparator)
+		}
+
+		// add the owner name if not present already
+		if !common.Contains(ratelimitsPatchOwnerList, owner) {
+			ratelimitsPatchOwnerList = append(ratelimitsPatchOwnerList, owner)
+		}
+		finalOwnerVal = strings.Join(ratelimitsPatchOwnerList, ownerRlpSeparator)
+
+		ratelimitsPatch.Annotations[envoyFilterAnnotationOwnerRLPs] = finalOwnerVal
+		if err := r.ReconcileResource(ctx, &istio.EnvoyFilter{}, ratelimitsPatch, alwaysUpdateEnvoyPatches); err != nil {
+			logger.Error(err, "failed to create/update EnvoyFilter that patches-in ratelimits")
+			return err
+		}
+		logger.Info("successfully created/updated ratelimits patch", "gateway", gwKey.String())
 	}
-	return client.ObjectKey{Namespace: defaultNamespace, Name: split[0]}
+
+	logger.Info("successfully reconciled RateLimitPolicy using attached VirtualService")
+	return nil
 }
 
 // rateLimitInitialPatch returns EnvoyFilter resource that patches-in
 // - Add Preauth RateLimit Filter as the first http filter
 // - Add PostAuth RateLimit Filter as the last http filter
 // - Change cluster name pointing to Limitador in kuadrant-system namespace (temp)
-// Note please make sure this patch is only created once per gateway.
-func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
+// Note: please make sure this patch is only created once per gateway.
+func ratelimitFiltersPatch(gwKey client.ObjectKey, gwLabels map[string]string) (*istio.EnvoyFilter, error) {
 
 	patchUnstructured := map[string]interface{}{
 		"operation": "INSERT_FIRST", // preauth should be the first filter in the chain
@@ -255,12 +277,11 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 	}
 
 	patchRaw, _ := json.Marshal(patchUnstructured)
-
 	prePatch := networkingv1alpha3.EnvoyFilter_Patch{}
-	err := prePatch.UnmarshalJSON(patchRaw)
-	if err != nil {
-		panic(err)
+	if err := prePatch.UnmarshalJSON(patchRaw); err != nil {
+		return nil, err
 	}
+
 	postPatch := prePatch.DeepCopy()
 	postPatch.Value.Fields["name"] = &types.Value{
 		Kind: &types.Value_StringValue{
@@ -323,22 +344,51 @@ func rateLimitInitialPatch(gateway client.ObjectKey) *istio.EnvoyFilter {
 	clusterPatch := common.LimitadorClusterEnvoyPatch()
 
 	factory := common.EnvoyFilterFactory{
-		ObjectName: gateway.Name + "-ratelimit-filters",
-		Namespace:  gateway.Namespace,
+		ObjectName: rlFiltersPatchName(gwKey.Name),
+		Namespace:  gwKey.Namespace,
 		Patches: []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
-			// Ordering matters here!
 			preAuthFilterPatch,
 			postAuthFilterPatch,
 			clusterPatch,
 		},
+		Labels: gwLabels,
 	}
 
-	return factory.EnvoyFilter()
+	return factory.EnvoyFilter(), nil
 }
 
-func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.Action_Specifier, stage apimv1alpha1.RateLimit_Stage) *istio.EnvoyFilter {
+func envoyRatelimitsPatch(rlp *apimv1alpha1.RateLimitPolicy, vHostNames []string, gwKey client.ObjectKey, gwLabels map[string]string) (*istio.EnvoyFilter, error) {
+	ratelimitsPatch := &istio.EnvoyFilter{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ratelimitsPatchName(rlp.Name, gwKey.Name),
+			Namespace: gwKey.Namespace,
+		},
+		Spec: networkingv1alpha3.EnvoyFilter{
+			WorkloadSelector: &networkingv1alpha3.WorkloadSelector{
+				Labels: gwLabels,
+			},
+			ConfigPatches: []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{},
+		},
+	}
+
+	// route-level patches
+	for _, host := range vHostNames {
+		for _, route := range rlp.Spec.Routes {
+			vHostName := host + ":80" // Istio names virtual host in this format: host + port
+
+			routePatch := routeRateLimitsPatch(vHostName, route)
+			ratelimitsPatch.Spec.ConfigPatches = append(ratelimitsPatch.Spec.ConfigPatches, routePatch)
+		}
+	}
+
+	// TODO(rahulanand16nov): add the virtualhost-level patch
+	return ratelimitsPatch, nil
+}
+
+// routeRateLimitsPatch returns an Envoy patch that add in ratelimits at the route level.
+func routeRateLimitsPatch(vHostName string, route apimv1alpha1.Route) *networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
 	stageValue := apimv1alpha1.RateLimit_Stage_value[apimv1alpha1.RateLimitStage_PREAUTH]
-	if stage == apimv1alpha1.RateLimitStage_POSTAUTH {
+	if route.Stage == apimv1alpha1.RateLimitStage_POSTAUTH {
 		stageValue = apimv1alpha1.RateLimit_Stage_value[apimv1alpha1.RateLimitStage_POSTAUTH]
 	}
 
@@ -359,7 +409,7 @@ func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.A
 	patchRaw, _ := json.Marshal(patchUnstructured)
 	stringPatch := string(patchRaw)
 
-	jsonActions, _ := json.Marshal(actions)
+	jsonActions, _ := json.Marshal(route.Actions)
 	// A nice trick to make it easier add-in actions
 	stringPatch = strings.Replace(stringPatch, "\"ACTIONS\"", string(jsonActions), 1)
 	patchRaw = []byte(stringPatch)
@@ -370,7 +420,7 @@ func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.A
 		panic(err)
 	}
 
-	if stage == apimv1alpha1.RateLimitStage_BOTH {
+	if route.Stage == apimv1alpha1.RateLimitStage_BOTH {
 		routeCopy := Patch.DeepCopy().Value.Fields["route"]
 		updatedRateLimits := routeCopy.GetStructValue().Fields["rate_limits"].GetListValue().Values
 		updatedRateLimits[0].GetStructValue().Fields["stage"] = &types.Value{
@@ -394,7 +444,7 @@ func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.A
 					Vhost: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
 						Name: vHostName,
 						Route: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch_RouteMatch{
-							Name: "." + routeName, // Istio adds '.' infront of names
+							Name: "." + route.Name, // Istio adds '.' infront of names
 						},
 					},
 				},
@@ -403,43 +453,7 @@ func routeRateLimitsPatch(vHostName, routeName string, actions []*apimv1alpha1.A
 		Patch: Patch,
 	}
 
-	// Need to make this unique among all the patches even if multi vhost with same
-	// route name is present.
-	objectName := "rate-limits-" + strings.ToLower(strings.Replace(routeName, "/", "-", -1))
-	factory := common.EnvoyFilterFactory{
-		ObjectName: objectName,
-		Namespace:  "kuadrant-system",
-		Patches: []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
-			envoyFilterPatch,
-		},
-	}
-
-	return factory.EnvoyFilter()
-}
-
-func doesRouteMatch(routeList []*networkingv1alpha3.HTTPRoute, targetRouteName string) bool {
-	for _, route := range routeList {
-		for _, match := range route.Match {
-			if match.Name == targetRouteName {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func alwaysUpdateRateLimit(existingObj, desiredObj client.Object) (bool, error) {
-	existing, ok := existingObj.(*v1alpha1.RateLimit)
-	if !ok {
-		return false, fmt.Errorf("%T is not a *networkingv1beta1.RateLimit", existingObj)
-	}
-	desired, ok := desiredObj.(*v1alpha1.RateLimit)
-	if !ok {
-		return false, fmt.Errorf("%T is not a *networkingv1beta1.RateLimit", desiredObj)
-	}
-
-	existing.Spec = desired.Spec
-	return true, nil
+	return envoyFilterPatch
 }
 
 func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {

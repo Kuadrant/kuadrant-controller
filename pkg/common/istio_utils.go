@@ -21,9 +21,14 @@ type EnvoyFilterFactory struct {
 	ObjectName string
 	Namespace  string
 	Patches    []*istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
+	Labels     map[string]string
 }
 
 func (v *EnvoyFilterFactory) EnvoyFilter() *istionetworkingv1alpha3.EnvoyFilter {
+	if len(v.Labels) == 0 {
+		// default to kuadrant labels to avoid replication where it's already used.
+		v.Labels = map[string]string{"istio": "kuadrant-system"}
+	}
 	return &istionetworkingv1alpha3.EnvoyFilter{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "EnvoyFilter",
@@ -35,7 +40,7 @@ func (v *EnvoyFilterFactory) EnvoyFilter() *istionetworkingv1alpha3.EnvoyFilter 
 		},
 		Spec: istioapiv1alpha3.EnvoyFilter{
 			WorkloadSelector: &istioapiv1alpha3.WorkloadSelector{
-				Labels: map[string]string{"istio": "kuadrant-system"},
+				Labels: v.Labels,
 			},
 			ConfigPatches: v.Patches,
 		},
