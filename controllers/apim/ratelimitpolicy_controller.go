@@ -85,21 +85,21 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	if rlp.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&rlp, filtersFinalizer) {
+	if rlp.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&rlp, patchesFinalizer) {
 		logger.Info("Removing finalizers")
 		if err := r.finalizeEnvoyFilters(ctx, &rlp); err != nil {
 			logger.Error(err, "failed to remove ownerRlp entry from filters patch")
 			return ctrl.Result{}, err
 		}
-		controllerutil.RemoveFinalizer(&rlp, filtersFinalizer)
+		controllerutil.RemoveFinalizer(&rlp, patchesFinalizer)
 		if err := r.BaseReconciler.UpdateResource(ctx, &rlp); client.IgnoreNotFound(err) != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 
-	if !controllerutil.ContainsFinalizer(&rlp, filtersFinalizer) {
-		controllerutil.AddFinalizer(&rlp, filtersFinalizer)
+	if !controllerutil.ContainsFinalizer(&rlp, patchesFinalizer) {
+		controllerutil.AddFinalizer(&rlp, patchesFinalizer)
 		if err := r.BaseReconciler.UpdateResource(ctx, &rlp); client.IgnoreNotFound(err) != nil {
 			return ctrl.Result{Requeue: true}, err
 		}

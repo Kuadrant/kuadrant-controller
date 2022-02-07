@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	filtersFinalizer = "kuadrant.io/ratelimitfilters"
+	patchesFinalizer = "kuadrant.io/ratelimitpatches"
 
 	ownerRlpSeparator = ","
 
