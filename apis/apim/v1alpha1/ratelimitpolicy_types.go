@@ -60,14 +60,19 @@ var RateLimit_Stage_value = map[RateLimit_Stage]int32{
 	"BOTH":     2,
 }
 
-type Route struct {
-	// name of the route present in the virutalservice
-	Name string `json:"name"`
+type RateLimit struct {
 	// Definfing phase at which rate limits will be applied.
 	// Valid values are: PREAUTH, POSTAUTH, BOTH
 	Stage RateLimit_Stage `json:"stage"`
-	// rule specific actions
+	// +optional
 	Actions []*Action_Specifier `json:"actions,omitempty"`
+}
+
+type Route struct {
+	// name of the route present in the virutalservice
+	Name string `json:"name"`
+	// +optional
+	RateLimits []*RateLimit `json:"rateLimits,omitempty"`
 }
 
 type NetworkingRef struct {
@@ -82,9 +87,11 @@ type RateLimitPolicySpec struct {
 	//+listType=map
 	//+listMapKey=name
 	Routes []Route `json:"routes,omitempty"`
-	// these actions are used for all of the matching rules
-	Actions []*Action_Specifier               `json:"actions,omitempty"`
-	Limits  []limitadorv1alpha1.RateLimitSpec `json:"limits,omitempty"`
+
+	// RateLimits are used for all of the matching rules
+	// +optional
+	RateLimits []*RateLimit                      `json:"rateLimits,omitempty"`
+	Limits     []limitadorv1alpha1.RateLimitSpec `json:"limits,omitempty"`
 }
 
 //+kubebuilder:object:root=true
