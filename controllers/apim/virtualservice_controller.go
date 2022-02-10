@@ -2,7 +2,6 @@ package apim
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -12,7 +11,6 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -23,6 +21,7 @@ import (
 	istiosecurityv1beta1 "istio.io/client-go/pkg/apis/security/v1beta1"
 
 	"github.com/go-logr/logr"
+	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	"github.com/kuadrant/kuadrant-controller/pkg/log"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 )
@@ -30,6 +29,9 @@ import (
 const (
 	KuadrantAuthProviderAnnotation = "kuadrant.io/auth-provider"
 )
+
+//+kubebuilder:rbac:groups=networking.istio.io,resources=virtualservices,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies,verbs=get;list;watch;create;update;patch;delete
 
 // VirtualServiceReconciler reconciles Istio's AuthorizationPolicy object
 type VirtualServiceReconciler struct {
@@ -53,24 +55,27 @@ func (r *VirtualServiceReconciler) Reconcile(eventCtx context.Context, req ctrl.
 	// check if this virtualservice is to be protected or not.
 	_, present := virtualService.GetAnnotations()[KuadrantAuthProviderAnnotation]
 	if !present {
-		authObjKey := types.NamespacedName{
-			Name:      getAuthPolicyName(virtualService.GetName()),
-			Namespace: virtualService.GetNamespace(),
-		}
-
-		authPolicy := istiosecurityv1beta1.AuthorizationPolicy{}
-		if err := r.Client().Get(context.Background(), authObjKey, &authPolicy); err != nil {
-			// no annotation but authpolicy exist means annotation was removed.
-			if !apierrors.IsNotFound(err) {
-				logger.Error(err, "failed to check AuthorizationPolicy existence")
+		for _, gateway := range virtualService.Spec.Gateways {
+			gwKey := common.NamespacedNameToObjectKey(gateway, virtualService.Namespace)
+			authObjKey := types.NamespacedName{
+				Name:      getAuthPolicyName(gwKey.Name, virtualService.Name),
+				Namespace: gwKey.Namespace,
 			}
-			return ctrl.Result{}, nil // this virtualservice is not protected.
-		}
 
-		// Orphan AuthorizationPolicy exists
-		if err := r.Client().Delete(context.Background(), &authPolicy); err != nil {
-			logger.Error(err, "failed to delete orphan authorizationpolicy")
-			return ctrl.Result{}, err
+			authPolicy := istiosecurityv1beta1.AuthorizationPolicy{}
+			if err := r.Client().Get(context.Background(), authObjKey, &authPolicy); err != nil {
+				// no annotation but authpolicy exist means annotation was removed.
+				if !apierrors.IsNotFound(err) {
+					logger.Error(err, "failed to check AuthorizationPolicy existence")
+				}
+				return ctrl.Result{}, nil // this virtualservice is not protected.
+			}
+
+			// Orphan AuthorizationPolicy exists
+			if err := r.Client().Delete(context.Background(), &authPolicy); err != nil {
+				logger.Error(err, "failed to delete orphan authorizationpolicy")
+				return ctrl.Result{}, err
+			}
 		}
 		return ctrl.Result{}, nil
 	}
@@ -85,19 +90,8 @@ func (r *VirtualServiceReconciler) Reconcile(eventCtx context.Context, req ctrl.
 	return ctrl.Result{}, nil
 }
 
-func getAuthPolicyName(vsName string) string {
-	return "source-virtualservice-" + vsName
-}
-
 func (r *VirtualServiceReconciler) reconcileAuthPolicy(logger logr.Logger, ctx context.Context, vs *istionetworkingv1alpha3.VirtualService) error {
 	logger.Info("Reconciling AuthorizationPolicy")
-
-	authPolicy := istiosecurityv1beta1.AuthorizationPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      getAuthPolicyName(vs.Name),
-			Namespace: vs.Namespace,
-		},
-	}
 
 	// annotation presence is already checked.
 	providerName, _ := vs.GetAnnotations()[KuadrantAuthProviderAnnotation]
@@ -132,7 +126,7 @@ func (r *VirtualServiceReconciler) reconcileAuthPolicy(logger logr.Logger, ctx c
 		}
 	}
 
-	authPolicy.Spec = securityv1beta1.AuthorizationPolicy{
+	authPolicySpec := securityv1beta1.AuthorizationPolicy{
 		Rules: []*securityv1beta1.Rule{{
 			To: authToRules,
 		}},
@@ -144,32 +138,30 @@ func (r *VirtualServiceReconciler) reconcileAuthPolicy(logger logr.Logger, ctx c
 		},
 	}
 
-	if err := controllerutil.SetOwnerReference(vs, &authPolicy, r.Client().Scheme()); err != nil {
-		logger.Error(err, "failed to add owner ref to AuthorizationPolicy resource")
-		return err
-	}
-	err := r.ReconcileResource(ctx, &istiosecurityv1beta1.AuthorizationPolicy{}, &authPolicy, alwaysUpdateAuthPolicy)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		logger.Error(err, "ReconcileResource failed to create/update AuthorizationPolicy resource")
-		return err
+	for _, gateway := range vs.Spec.Gateways {
+		gwKey := common.NamespacedNameToObjectKey(gateway, vs.Namespace)
+
+		authPolicy := istiosecurityv1beta1.AuthorizationPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      getAuthPolicyName(gwKey.Name, vs.Name),
+				Namespace: vs.Namespace,
+			},
+			Spec: authPolicySpec,
+		}
+
+		if err := controllerutil.SetOwnerReference(vs, &authPolicy, r.Client().Scheme()); err != nil {
+			logger.Error(err, "failed to add owner ref to AuthorizationPolicy resource")
+			return err
+		}
+		err := r.ReconcileResource(ctx, &istiosecurityv1beta1.AuthorizationPolicy{}, &authPolicy, alwaysUpdateAuthPolicy)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			logger.Error(err, "ReconcileResource failed to create/update AuthorizationPolicy resource")
+			return err
+		}
 	}
 
 	logger.Info("successfully created/updated AuthorizationPolicy resource(s)")
 	return nil
-}
-
-func alwaysUpdateAuthPolicy(existingObj, desiredObj client.Object) (bool, error) {
-	existing, ok := existingObj.(*istiosecurityv1beta1.AuthorizationPolicy)
-	if !ok {
-		return false, fmt.Errorf("%T is not a *istiosecurityv1beta1.AuthorizationPolicy", existingObj)
-	}
-	desired, ok := desiredObj.(*istiosecurityv1beta1.AuthorizationPolicy)
-	if !ok {
-		return false, fmt.Errorf("%T is not a *istiosecurityv1beta1.AuthorizationPolicy", desiredObj)
-	}
-
-	existing.Spec = desired.Spec
-	return true, nil
 }
 
 func normalizeStringMatch(sm *networkingv1alpha3.StringMatch) string {
