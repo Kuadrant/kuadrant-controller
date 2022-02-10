@@ -167,9 +167,9 @@ func (r *RateLimitPolicyReconciler) reconcileWithVirtualService(ctx context.Cont
 
 		// create/update ratelimit filters patch
 		// fetch already existing filters patch or create a new one
-		filtersPatckKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: rlFiltersPatchName(gwKey.Name)}
+		filtersPatchKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: rlFiltersPatchName(gwKey.Name)}
 		filtersPatch := &istio.EnvoyFilter{}
-		if err := r.Client().Get(ctx, filtersPatckKey, filtersPatch); err != nil {
+		if err := r.Client().Get(ctx, filtersPatchKey, filtersPatch); err != nil {
 			if !apierrors.IsNotFound(err) {
 				logger.Error(err, "failed to get ratelimit filters patch")
 				return err

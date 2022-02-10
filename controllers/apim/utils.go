@@ -17,7 +17,7 @@ func gatewayLabels(ctx context.Context, client client.Client, gwKey client.Objec
 	if err := client.Get(ctx, gwKey, gateway); err != nil {
 		return map[string]string{}
 	}
-	return gateway.Labels
+	return gateway.Spec.Selector
 }
 
 // rlFiltersPatchName returns the name of EnvoyFilter adding in rate-limit filters to a gateway.
