@@ -81,7 +81,7 @@ func (r *VirtualServiceReconciler) Reconcile(eventCtx context.Context, req ctrl.
 	}
 
 	// reconcile authpolicy for the protected virtualservice
-	if err := r.reconcileAuthPolicy(logger, ctx, &virtualService); err != nil {
+	if err := r.reconcileAuthPolicy(ctx, logger, &virtualService); err != nil {
 		logger.Error(err, "failed to reconcile AuthorizationPolicy")
 		return ctrl.Result{}, err
 	}
@@ -90,11 +90,11 @@ func (r *VirtualServiceReconciler) Reconcile(eventCtx context.Context, req ctrl.
 	return ctrl.Result{}, nil
 }
 
-func (r *VirtualServiceReconciler) reconcileAuthPolicy(logger logr.Logger, ctx context.Context, vs *istionetworkingv1alpha3.VirtualService) error {
+func (r *VirtualServiceReconciler) reconcileAuthPolicy(ctx context.Context, logger logr.Logger, vs *istionetworkingv1alpha3.VirtualService) error {
 	logger.Info("Reconciling AuthorizationPolicy")
 
 	// annotation presence is already checked.
-	providerName, _ := vs.GetAnnotations()[KuadrantAuthProviderAnnotation]
+	providerName := vs.GetAnnotations()[KuadrantAuthProviderAnnotation]
 
 	// fill out the rules
 	authToRules := []*securityv1beta1.Rule_To{}

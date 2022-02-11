@@ -24,37 +24,37 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-type RL_GenericKey struct {
+type RLGenericKey struct {
 	DescriptorKey   string `json:"descriptor_key"`
 	DescriptorValue string `json:"descriptor_value"`
 }
 
-type Action_Specifier struct {
-	GenericKey RL_GenericKey `json:"generic_key"`
+type ActionSpecifier struct {
+	GenericKey RLGenericKey `json:"generic_key"`
 }
 
 // +kubebuilder:validation:Enum=PREAUTH;POSTAUTH;BOTH
-type RateLimit_Stage string
+type RateLimitStage string
 
 // +kubebuilder:validation:Enum=HTTPRoute;VirtualService
-type NetworkingRef_Type string
+type NetworkingRefType string
 
 const (
-	RateLimitStage_PREAUTH  RateLimit_Stage = "PREAUTH"
-	RateLimitStage_POSTAUTH RateLimit_Stage = "POSTAUTH"
-	RateLimitStage_BOTH     RateLimit_Stage = "BOTH"
+	RateLimitStagePREAUTH  RateLimitStage = "PREAUTH"
+	RateLimitStagePOSTAUTH RateLimitStage = "POSTAUTH"
+	RateLimitStageBOTH     RateLimitStage = "BOTH"
 
-	NetworkingRefType_HR NetworkingRef_Type = "HTTPRoute"
-	NetworkingRefType_VS NetworkingRef_Type = "VirtualService"
+	NetworkingRefTypeHR NetworkingRefType = "HTTPRoute"
+	NetworkingRefTypeVS NetworkingRefType = "VirtualService"
 )
 
-var RateLimit_Stage_name = map[int32]string{
+var RateLimitStageName = map[int32]string{
 	0: "PREAUTH",
 	1: "POSTAUTH",
 	2: "BOTH",
 }
 
-var RateLimit_Stage_value = map[RateLimit_Stage]int32{
+var RateLimitStageValue = map[RateLimitStage]int32{
 	"PREAUTH":  0,
 	"POSTAUTH": 1,
 	"BOTH":     2,
@@ -65,14 +65,14 @@ type Route struct {
 	Name string `json:"name"`
 	// Definfing phase at which rate limits will be applied.
 	// Valid values are: PREAUTH, POSTAUTH, BOTH
-	Stage RateLimit_Stage `json:"stage"`
+	Stage RateLimitStage `json:"stage"`
 	// rule specific actions
-	Actions []*Action_Specifier `json:"actions,omitempty"`
+	Actions []*ActionSpecifier `json:"actions,omitempty"`
 }
 
 type NetworkingRef struct {
-	Type NetworkingRef_Type `json:"type"`
-	Name string             `json:"name"`
+	Type NetworkingRefType `json:"type"`
+	Name string            `json:"name"`
 }
 
 // RateLimitPolicySpec defines the desired state of RateLimitPolicy
@@ -86,7 +86,7 @@ type RateLimitPolicySpec struct {
 	//+listMapKey=name
 	Routes []Route `json:"routes,omitempty"`
 	// these actions are used for all of the matching rules
-	Actions []*Action_Specifier               `json:"actions,omitempty"`
+	Actions []*ActionSpecifier                `json:"actions,omitempty"`
 	Limits  []limitadorv1alpha1.RateLimitSpec `json:"limits,omitempty"`
 }
 

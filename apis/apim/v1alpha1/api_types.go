@@ -26,7 +26,7 @@ type OPARef struct {
 	ConfigMap *v1.LocalObjectReference `json:"configMap,omitempty"`
 }
 
-type API_Metadata struct {
+type APIMetadata struct {
 	Version     string `json:"version"`
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
@@ -34,7 +34,7 @@ type API_Metadata struct {
 }
 
 type APISpec struct {
-	Info API_Metadata `json:"info"`
+	Info APIMetadata `json:"info"`
 }
 
 // +kubebuilder:object:root=true

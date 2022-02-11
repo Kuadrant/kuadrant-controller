@@ -20,10 +20,6 @@ const (
 	envoyFilterAnnotationOwnerRLPs = "kuadrant.io/ownerRateLimitPolicies"
 )
 
-// ownerRateLimitPolicies stores the name of any RateLimitPolicy that is dependant
-// upon the contents of an EnvoyFilter resource as an annotation's value.
-type ownerRateLimitPolicies []string
-
 // finalizeEnvoyFilters makes sure orphan EnvoyFilter resources are not left when deleting the owner RateLimitPolicy.
 func (r *RateLimitPolicyReconciler) finalizeEnvoyFilters(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
 	logger := logr.FromContext(ctx)
@@ -32,10 +28,10 @@ func (r *RateLimitPolicyReconciler) finalizeEnvoyFilters(ctx context.Context, rl
 
 	for _, networkingRef := range rlp.Spec.NetworkingRef {
 		switch networkingRef.Type {
-		case apimv1alpha1.NetworkingRefType_HR:
+		case apimv1alpha1.NetworkingRefTypeHR:
 			logger.Info("HTTPRoute is not implemented yet") // TODO(rahulanand16nov)
 			continue
-		case apimv1alpha1.NetworkingRefType_VS:
+		case apimv1alpha1.NetworkingRefTypeVS:
 			logger.Info("Removing/Updating EnvoyFilter resources using VirtualService")
 			vs := istio.VirtualService{}
 			vsKey := client.ObjectKey{Namespace: rlp.Namespace, Name: networkingRef.Name}

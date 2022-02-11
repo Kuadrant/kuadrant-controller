@@ -111,10 +111,10 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 
 	for _, networkingRef := range rlp.Spec.NetworkingRef {
 		switch networkingRef.Type {
-		case apimv1alpha1.NetworkingRefType_HR:
+		case apimv1alpha1.NetworkingRefTypeHR:
 			logger.Info("HTTPRoute is not implemented yet") // TODO(rahulanand16nov)
 			return ctrl.Result{}, nil
-		case apimv1alpha1.NetworkingRefType_VS:
+		case apimv1alpha1.NetworkingRefTypeVS:
 			vsNamespacedName := client.ObjectKey{
 				Namespace: rlp.Namespace, // VirtualService lookup is limited to RLP's namespace
 				Name:      networkingRef.Name,
@@ -252,7 +252,6 @@ func (r *RateLimitPolicyReconciler) reconcileWithVirtualService(ctx context.Cont
 // - Change cluster name pointing to Limitador in kuadrant-system namespace (temp)
 // Note: please make sure this patch is only created once per gateway.
 func ratelimitFiltersPatch(gwKey client.ObjectKey, gwLabels map[string]string) (*istio.EnvoyFilter, error) {
-
 	patchUnstructured := map[string]interface{}{
 		"operation": "INSERT_FIRST", // preauth should be the first filter in the chain
 		"value": map[string]interface{}{
@@ -376,7 +375,10 @@ func envoyRatelimitsPatch(rlp *apimv1alpha1.RateLimitPolicy, vHostNames []string
 		for _, route := range rlp.Spec.Routes {
 			vHostName := host + ":80" // Istio names virtual host in this format: host + port
 
-			routePatch := routeRateLimitsPatch(vHostName, route)
+			routePatch, err := routeRateLimitsPatch(vHostName, route)
+			if err != nil {
+				return nil, err
+			}
 			ratelimitsPatch.Spec.ConfigPatches = append(ratelimitsPatch.Spec.ConfigPatches, routePatch)
 		}
 	}
@@ -386,10 +388,10 @@ func envoyRatelimitsPatch(rlp *apimv1alpha1.RateLimitPolicy, vHostNames []string
 }
 
 // routeRateLimitsPatch returns an Envoy patch that add in ratelimits at the route level.
-func routeRateLimitsPatch(vHostName string, route apimv1alpha1.Route) *networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
-	stageValue := apimv1alpha1.RateLimit_Stage_value[apimv1alpha1.RateLimitStage_PREAUTH]
-	if route.Stage == apimv1alpha1.RateLimitStage_POSTAUTH {
-		stageValue = apimv1alpha1.RateLimit_Stage_value[apimv1alpha1.RateLimitStage_POSTAUTH]
+func routeRateLimitsPatch(vHostName string, route apimv1alpha1.Route) (*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, error) {
+	stageValue := apimv1alpha1.RateLimitStageValue[apimv1alpha1.RateLimitStagePREAUTH]
+	if route.Stage == apimv1alpha1.RateLimitStagePOSTAUTH {
+		stageValue = apimv1alpha1.RateLimitStageValue[apimv1alpha1.RateLimitStagePOSTAUTH]
 	}
 
 	patchUnstructured := map[string]interface{}{
@@ -415,12 +417,11 @@ func routeRateLimitsPatch(vHostName string, route apimv1alpha1.Route) *networkin
 	patchRaw = []byte(stringPatch)
 
 	Patch := &networkingv1alpha3.EnvoyFilter_Patch{}
-	err := Patch.UnmarshalJSON(patchRaw)
-	if err != nil {
-		panic(err)
+	if err := Patch.UnmarshalJSON(patchRaw); err != nil {
+		return nil, err
 	}
 
-	if route.Stage == apimv1alpha1.RateLimitStage_BOTH {
+	if route.Stage == apimv1alpha1.RateLimitStageBOTH {
 		routeCopy := Patch.DeepCopy().Value.Fields["route"]
 		updatedRateLimits := routeCopy.GetStructValue().Fields["rate_limits"].GetListValue().Values
 		updatedRateLimits[0].GetStructValue().Fields["stage"] = &types.Value{
@@ -453,7 +454,7 @@ func routeRateLimitsPatch(vHostName string, route apimv1alpha1.Route) *networkin
 		Patch: Patch,
 	}
 
-	return envoyFilterPatch
+	return envoyFilterPatch, nil
 }
 
 func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
