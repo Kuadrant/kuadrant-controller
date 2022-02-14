@@ -2,13 +2,9 @@ apiVersion: apim.kuadrant.io/v1alpha1
 kind: RateLimitPolicy
 metadata:
   name: ratelimitpolicy-sample
-  namespace: kuadrant-system
   labels:
     app: toystore
 spec:
-  networkingRef:
-    - type: VirtualService
-      name: toystore
   routes:
     - name: get-toy
       stage: BOTH
