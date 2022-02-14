@@ -35,7 +35,6 @@ func routingPredicate(m *rateLimitPolicyMapper) predicate.Predicate {
 			// annotation is present.
 			_, toProtect := e.Object.GetAnnotations()[KuadrantAuthProviderAnnotation]
 			return toProtect
-
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			_, toRateLimitOld := e.ObjectOld.GetAnnotations()[KuadrantRateLimitPolicyAnnotation]
@@ -92,10 +91,8 @@ func (m *rateLimitPolicyMapper) SignalCreate(obj client.Object) error {
 
 	// signal addition by adding 'add' annotation
 	rlp.Annotations[addAnnotation] = obj.GetName()
-	if err := m.K8sClient.Update(context.Background(), rlp); err != nil {
-		return err
-	}
-	return nil
+	err := m.K8sClient.Update(context.Background(), rlp)
+	return err
 }
 
 func (m *rateLimitPolicyMapper) SignalDelete(obj client.Object) error {
@@ -118,10 +115,8 @@ func (m *rateLimitPolicyMapper) SignalDelete(obj client.Object) error {
 
 	// signal deletion by adding 'delete' annotation
 	rlp.Annotations[deleteAnnotation] = obj.GetName()
-	if err := m.K8sClient.Update(context.Background(), rlp); err != nil {
-		return err
-	}
-	return nil
+	err := m.K8sClient.Update(context.Background(), rlp)
+	return err
 }
 
 // SignalUpdate is used when either old or new object had/has the ratelimit annotaiton

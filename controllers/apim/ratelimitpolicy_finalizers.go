@@ -33,13 +33,13 @@ func (r *RateLimitPolicyReconciler) finalizeEnvoyFilters(ctx context.Context, rl
 		return err
 	}
 
-	for _, vs := range vsList.Items {
-		if val, present := vs.Annotations[KuadrantRateLimitPolicyAnnotation]; !present || (val != rlp.Name) {
+	for idx := range vsList.Items {
+		if val, present := vsList.Items[idx].Annotations[KuadrantRateLimitPolicyAnnotation]; !present || (val != rlp.Name) {
 			continue
 		}
-		vsKey := client.ObjectKeyFromObject(&vs)
-		for _, gateway := range vs.Spec.Gateways {
-			gwKey := common.NamespacedNameToObjectKey(gateway, vs.Namespace)
+		vsKey := client.ObjectKeyFromObject(&vsList.Items[idx])
+		for _, gateway := range vsList.Items[idx].Spec.Gateways {
+			gwKey := common.NamespacedNameToObjectKey(gateway, vsList.Items[idx].Namespace)
 
 			filtersPatchkey := client.ObjectKey{
 				Namespace: gwKey.Namespace,

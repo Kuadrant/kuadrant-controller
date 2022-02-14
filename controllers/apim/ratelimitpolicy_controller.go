@@ -125,7 +125,7 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 			return ctrl.Result{}, err
 		}
 
-		if err := r.detachFromNetwork(ctx, vs.Spec.Gateways, vs.Spec.Hosts, vsKey, &rlp); err != nil {
+		if err := r.detachFromNetwork(ctx, vs.Spec.Gateways, vsKey, &rlp); err != nil {
 			logger.Error(err, "failed to detach RateLimitPolicy from VirtualService")
 			return ctrl.Result{}, err
 		}
@@ -166,7 +166,7 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 			logger.Error(err, "failed to remove operation specific annotations from RateLimitPolicy")
 			return ctrl.Result{}, err
 		}
-		logger.Info("successfully removed operation specfic annotations from RateLimitPolicy")
+		logger.Info("successfully removed operation specific annotations from RateLimitPolicy")
 	}
 
 	// TODO(rahulanand16nov): do the same as above for HTTPRoute
@@ -176,7 +176,7 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 	return ctrl.Result{}, nil
 }
 
-func (r *RateLimitPolicyReconciler) detachFromNetwork(ctx context.Context, gateways, hosts []string, owner string, rlp *apimv1alpha1.RateLimitPolicy) error {
+func (r *RateLimitPolicyReconciler) detachFromNetwork(ctx context.Context, gateways []string, owner string, rlp *apimv1alpha1.RateLimitPolicy) error {
 	logger := logr.FromContext(ctx)
 	ownerKey := common.NamespacedNameToObjectKey(owner, rlp.Namespace)
 	logger.Info("Detaching RateLimitPolicy from a network")
@@ -557,7 +557,6 @@ func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *ap
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RateLimitPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apimv1alpha1.RateLimitPolicy{}).
 		Complete(r)
