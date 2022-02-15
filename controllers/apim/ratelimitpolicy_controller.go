@@ -485,9 +485,6 @@ func virtualHostRateLimitsPatch(vHostName string, rateLimits []*apimv1alpha1.Rat
 				RouteConfiguration: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch{
 					Vhost: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
 						Name: vHostName,
-						Route: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch_RouteMatch{
-							Action: networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch_RouteMatch_ANY,
-						},
 					},
 				},
 			},
