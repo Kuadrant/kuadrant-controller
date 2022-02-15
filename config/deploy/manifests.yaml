@@ -138,8 +138,8 @@ spec:
                   - variables
                   type: object
                 type: array
-              routes:
-                description: route specific staging and actions
+              rateLimits:
+                description: RateLimits are used for all of the matching rules
                 items:
                   properties:
                     actions:

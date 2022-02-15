@@ -4,9 +4,6 @@ kind: RateLimitPolicy
 metadata:
   name: toystore
 spec:
-  networkingRef:
-    - type: VirtualService
-      name: toystore
   routes:
     - name: get-toy
       rateLimits:
