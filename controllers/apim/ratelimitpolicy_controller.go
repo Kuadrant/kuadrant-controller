@@ -439,12 +439,6 @@ func routeRateLimitsPatch(vHostName string, routeName string, rateLimits []*apim
 		"operation": "MERGE",
 		"value": map[string]interface{}{
 			"route": map[string]interface{}{
-				"typed_per_filter_config": map[string]interface{}{
-					"envoy.filters.http.ratelimit": map[string]interface{}{
-						"@type":          "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute",
-						"vh_rate_limits": "include",
-					},
-				},
 				"rate_limits": common.EnvoyFilterRatelimitsUnstructured(rateLimits),
 			},
 		},
@@ -503,6 +497,13 @@ func virtualHostRateLimitsPatch(vHostName string, rateLimits []*apimv1alpha1.Rat
 		"operation": "MERGE",
 		"value": map[string]interface{}{
 			"rate_limits": common.EnvoyFilterRatelimitsUnstructured(rateLimits),
+			"typed_per_filter_config": map[string]interface{}{
+				// Note the following name is different from what we have given to our pre/post auth ratelimit filters
+				"envoy.filters.http.ratelimit": map[string]interface{}{
+					"@type":          "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute",
+					"vh_rate_limits": "INCLUDE",
+				},
+			},
 		},
 	}
 
