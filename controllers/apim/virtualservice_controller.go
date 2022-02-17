@@ -46,7 +46,7 @@ func (r *VirtualServiceReconciler) Reconcile(eventCtx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// TODO(rahulanand16nov): handle HTTPRoute deletion for AuthPolicy
+	// TODO(rahulanand16nov): handle VirtualService deletion for AuthPolicy
 	// check if this virtualservice is to be protected or not.
 	_, present := virtualService.GetAnnotations()[KuadrantAuthProviderAnnotation]
 	if !present {
@@ -80,6 +80,7 @@ func (r *VirtualServiceReconciler) reconcileAuthPolicy(ctx context.Context, logg
 	// annotation presence is already checked.
 	providerName := vs.GetAnnotations()[KuadrantAuthProviderAnnotation]
 
+	// TODO(rahulanand16nov): update following to match HTTPRoute controller
 	// fill out the rules
 	authToRules := []*securityv1beta1.Rule_To{}
 	for _, httpRoute := range vs.Spec.Http {
