@@ -498,7 +498,9 @@ func virtualHostRateLimitsPatch(vHostName string, rateLimits []*apimv1alpha1.Rat
 		"value": map[string]interface{}{
 			"rate_limits": common.EnvoyFilterRatelimitsUnstructured(rateLimits),
 			"typed_per_filter_config": map[string]interface{}{
-				// Note the following name is different from what we have given to our pre/post auth ratelimit filters
+				// Note the following name is different from what we have given to our pre/post-auth
+				// ratelimit filters. It's because you refer to the type of filter and not the name field
+				// of the filter. This infers it's configured for both filters in our case.
 				"envoy.filters.http.ratelimit": map[string]interface{}{
 					"@type":          "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute",
 					"vh_rate_limits": "INCLUDE",
