@@ -33,7 +33,7 @@ func ratelimitsPatchName(gwName string, networkKey client.ObjectKey) string {
 
 // limitadorRatelimitsName returns the name of Limitador RateLimit CR.
 func limitadorRatelimitsName(objKey client.ObjectKey, idx int) string {
-	return fmt.Sprintf("%s-%s-%d", objKey.Namespace, objKey.Name, idx)
+	return fmt.Sprintf("rlp-%s-%s-%d", objKey.Namespace, objKey.Name, idx)
 }
 
 // getAuthPolicyName generates the name of an AuthorizationPolicy using VirtualService info.
