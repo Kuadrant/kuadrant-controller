@@ -493,6 +493,10 @@ func virtualHostRateLimitsPatch(vHostName string, rateLimits []*apimv1alpha1.Rat
 	//           - request_headers:
 	//               header_name: ":method"
 	//               descriptor_key: "req.method"
+	//     typed_per_filter_config:
+	//       envoy.filters.http.ratelimit:
+	//         @type: "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute"
+	//         vh_rate_limits: INCLUDE
 	patchUnstructured := map[string]interface{}{
 		"operation": "MERGE",
 		"value": map[string]interface{}{
