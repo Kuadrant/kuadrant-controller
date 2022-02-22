@@ -6,9 +6,7 @@ metadata:
     app: toystore
 spec:
   parentRefs:
-    - group: networking.istio.io
-      kind: Gateway
-      name: kuadrant-gateway
+    - name: kuadrant-gwapi-gateway
       namespace: kuadrant-system
   hostnames: ["*.toystore.com"]
   rules:

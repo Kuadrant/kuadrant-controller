@@ -143,6 +143,11 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
+install-gateway-api: kustomize ## Install Gateway API CRDs into the K8s cluster specified in ~/.kube/config.
+	kubectl kustomize "github.com/kubernetes-sigs/gateway-api/config/crd?ref=v0.4.0" | kubectl apply -f -
+
+remove-gateway-api: kustomize ## Removes Gateway API CRDs from the K8s cluster.
+	kubectl kustomize "github.com/kubernetes-sigs/gateway-api/config/crd?ref=v0.4.0" | kubectl delete -f -
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
@@ -261,6 +266,7 @@ istio-manifest-update-test: generate-istio-manifests
 .PHONY: local-setup
 local-setup: local-cleanup local-setup-kind manifests kustomize generate
 	export PATH=$(PROJECT_PATH)/bin:$$PATH;	./utils/local-deployment/local-setup.sh
+	if [[ '$(GWAPI_GATEWAY)' -eq 'yes' ]]; then $(MAKE) deploy-gwapi-gateway; fi;	
 
 # Deploys all services and manifests required by kuadrant to run
 # kuadrant is not deployed
@@ -270,6 +276,9 @@ local-env-setup: local-cleanup local-setup-kind deploy-kuadrant-deps generate in
 .PHONY: deploy-kuadrant-deps
 deploy-kuadrant-deps:
 	./utils/local-deployment/deploy-kuadrant-deps.sh
+
+deploy-gwapi-gateway: install-gateway-api ## Gateway API's Gateway resource with manual deployment
+	kubectl apply -f ./utils/local-deployment/gwapi-gateway.yaml
 
 KIND_CLUSTER_NAME = kuadrant-local
 
