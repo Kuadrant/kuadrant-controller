@@ -8,7 +8,7 @@ spec:
   gatewayClassName: istio
   listeners:
   - name: default
-    hostname: "*.toystore.com"
+    hostname: "*.com"
     port: 80
     protocol: HTTP
     allowedRoutes:
