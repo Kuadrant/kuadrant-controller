@@ -39,6 +39,8 @@ spec:
             descriptor_key: "path"
             header_name: ":path"
         - remote_address: {}
+    - stage: POSTAUTH
+      actions:
         - metadata:
             descriptor_key: "user_id"
             metadata_key:
