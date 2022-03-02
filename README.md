@@ -159,7 +159,7 @@ Should return `200 OK`
 curl -v -H 'Host: api.toystore.com' -H 'Authorization: APIKEY ALICEKEYFORDEMO' -X POST http://localhost:9080/admin/toy
 ```
 
-9.- Verify authenticated rate limit per user
+10.- Verify authenticated rate limit per user
 
 4 times and should be rate limited
 
