@@ -84,16 +84,10 @@ type ActionSpecifier struct {
 // +kubebuilder:validation:Enum=PREAUTH;POSTAUTH;BOTH
 type RateLimitStage string
 
-// +kubebuilder:validation:Enum=HTTPRoute;VirtualService
-type NetworkingRefType string
-
 const (
 	RateLimitStagePREAUTH  RateLimitStage = "PREAUTH"
 	RateLimitStagePOSTAUTH RateLimitStage = "POSTAUTH"
 	RateLimitStageBOTH     RateLimitStage = "BOTH"
-
-	NetworkingRefTypeHR NetworkingRefType = "HTTPRoute"
-	NetworkingRefTypeVS NetworkingRefType = "VirtualService"
 )
 
 var RateLimitStageValue = map[RateLimitStage]int32{
@@ -109,28 +103,27 @@ type RateLimit struct {
 	Actions []*ActionSpecifier `json:"actions,omitempty"`
 }
 
-type Route struct {
-	// name of the route present in the virutalservice
-	Name string `json:"name"`
+type Operation struct {
+	Paths   []string `json:"paths,omitempty"`
+	Methods []string `json:"methods,omitempty"`
+	Hosts   []string `json:"hosts,omitempty"`
+}
+
+type Rule struct {
+	Name string `json:"name,omitempty"`
+	// Operation specifies the operations of a request
+	// +optional
+	Operation *Operation `json:"operation,omitempty"`
 	// +optional
 	RateLimits []*RateLimit `json:"rateLimits,omitempty"`
 }
 
-type NetworkingRef struct {
-	Type NetworkingRefType `json:"type"`
-	Name string            `json:"name"`
-}
-
 // RateLimitPolicySpec defines the desired state of RateLimitPolicy
 type RateLimitPolicySpec struct {
-	// route specific staging and actions
-	//+listType=map
-	//+listMapKey=name
-	Routes []Route `json:"routes,omitempty"`
-
-	// RateLimits are used for all of the matching rules
+	Rules []Rule `json:"rules,omitempty"`
 	// +optional
 	RateLimits []*RateLimit                      `json:"rateLimits,omitempty"`
+	Domain     string                            `json:"domain"`
 	Limits     []limitadorv1alpha1.RateLimitSpec `json:"limits,omitempty"`
 }
 

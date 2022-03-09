@@ -36,6 +36,8 @@ spec:
           spec:
             description: RateLimitPolicySpec defines the desired state of RateLimitPolicy
             properties:
+              domain:
+                type: string
               limits:
                 items:
                   description: RateLimitSpec defines the desired state of RateLimit
@@ -63,7 +65,6 @@ spec:
                   type: object
                 type: array
               rateLimits:
-                description: RateLimits are used for all of the matching rules
                 items:
                   properties:
                     actions:
@@ -145,13 +146,27 @@ spec:
                   - stage
                   type: object
                 type: array
-              routes:
-                description: route specific staging and actions
+              rules:
                 items:
                   properties:
                     name:
-                      description: name of the route present in the virutalservice
                       type: string
+                    operation:
+                      description: Operation specifies the operations of a request
+                      properties:
+                        hosts:
+                          items:
+                            type: string
+                          type: array
+                        methods:
+                          items:
+                            type: string
+                          type: array
+                        paths:
+                          items:
+                            type: string
+                          type: array
+                      type: object
                     rateLimits:
                       items:
                         properties:
@@ -235,13 +250,10 @@ spec:
                         - stage
                         type: object
                       type: array
-                  required:
-                  - name
                   type: object
                 type: array
-                x-kubernetes-list-map-keys:
-                - name
-                x-kubernetes-list-type: map
+            required:
+            - domain
             type: object
           status:
             description: RateLimitPolicyStatus defines the observed state of RateLimitPolicy

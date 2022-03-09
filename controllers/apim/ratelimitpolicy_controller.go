@@ -19,6 +19,7 @@ package apim
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	"github.com/gogo/protobuf/types"
@@ -168,7 +169,7 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 			return ctrl.Result{}, err
 		}
 
-		if err := r.attachToNetwork(ctx, vs.Spec.Gateways, vs.Spec.Hosts, vsKey, &rlp); err != nil {
+		if err := r.attachToNetwork(ctx, vs.Spec.Gateways, vsKey, &rlp); err != nil {
 			logger.Error(err, "failed to attach RateLimitPolicy to VirtualService")
 			return ctrl.Result{}, err
 		}
@@ -239,9 +240,8 @@ func (r *RateLimitPolicyReconciler) detachFromNetwork(ctx context.Context, gatew
 	return nil
 }
 
-func (r *RateLimitPolicyReconciler) attachToNetwork(ctx context.Context, gateways, hosts []string, owner string, rlp *apimv1alpha1.RateLimitPolicy) error {
+func (r *RateLimitPolicyReconciler) attachToNetwork(ctx context.Context, gateways []string, owner string, rlp *apimv1alpha1.RateLimitPolicy) error {
 	logger := logr.FromContext(ctx)
-	ownerKey := common.NamespacedNameToObjectKey(owner, rlp.Namespace)
 	logger.Info("Attaching RateLimitPolicy to a network")
 
 	for _, gw := range gateways {
@@ -250,310 +250,216 @@ func (r *RateLimitPolicyReconciler) attachToNetwork(ctx context.Context, gateway
 
 		// create/update ratelimit filters patch
 		// fetch already existing filters patch or create a new one
-		filtersPatchKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: rlFiltersPatchName(gwKey.Name)}
-		filtersPatch := &istio.EnvoyFilter{}
-		if err := r.Client().Get(ctx, filtersPatchKey, filtersPatch); err != nil {
+		wasmEnvoyFilterKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: rlFiltersPatchName(gwKey.Name)}
+		wasmEnvoyFilter := &istio.EnvoyFilter{}
+		if err := r.Client().Get(ctx, wasmEnvoyFilterKey, wasmEnvoyFilter); err != nil {
 			if !apierrors.IsNotFound(err) {
 				logger.Error(err, "failed to get ratelimit filters patch")
 				return err
 			}
-			filtersPatch, err = ratelimitFiltersPatch(gwKey, gwLabels)
-			if err != nil {
-				logger.Error(err, "failed to form ratelimit filters patch")
-				return err
-			}
 		}
 
-		if err := r.addParentRefEntry(ctx, filtersPatch, owner); err != nil {
+		if err := updateEnvoyFilter(ctx, wasmEnvoyFilter, rlp, gwKey, gwLabels); err != nil {
+			logger.Error(err, "failed to create/update EnvoyFilter containing wasm filters")
+			return err
+		}
+
+		if err := r.addParentRefEntry(ctx, wasmEnvoyFilter, owner); err != nil {
 			logger.Error(err, "failed to add ownerRLP entry to the ratelimit filters patch")
 			return err
 		}
+
 		logger.Info("successfully created/updated ratelimit filters patch", "gateway", gwKey.String())
-
-		// create/update ratelimits patch
-		ratelimitsPatchKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: ratelimitsPatchName(gwKey.Name, ownerKey)}
-		ratelimitsEnvoyFilter := &istio.EnvoyFilter{}
-		if err := r.Client().Get(ctx, ratelimitsPatchKey, ratelimitsEnvoyFilter); err != nil {
-			if !apierrors.IsNotFound(err) {
-				logger.Error(err, "failed to get ratelimits patch")
-				return err
-			}
-			ratelimitsEnvoyFilter = desiredRatelimitsEnvoyFilter(rlp, hosts, gwKey, ownerKey, gwLabels)
-		}
-
-		// Note(rahulanand16nov): ratelimits patch don't require parentRef because they are unique per VirtualService
-		if err := r.ReconcileResource(ctx, &istio.EnvoyFilter{}, ratelimitsEnvoyFilter, alwaysUpdateEnvoyPatches); err != nil {
-			logger.Error(err, "failed to reconcile ratelimits patch")
-			return err
-		}
-		logger.Info("successfully created/updated ratelimits patch", "gateway", gwKey.String())
 	}
 	logger.Info("successfully attached RateLimitPolicy to specified gateways and hosts")
 	return nil
 }
 
-// rateLimitInitialPatch returns EnvoyFilter resource that patches-in
-// - Add Preauth RateLimit Filter as the first http filter
-// - Add PostAuth RateLimit Filter as the last http filter
-// - Change cluster name pointing to Limitador in kuadrant-system namespace (temp)
-// Note: please make sure this patch is only created once per gateway.
-func ratelimitFiltersPatch(gwKey client.ObjectKey, gwLabels map[string]string) (*istio.EnvoyFilter, error) {
-	patchUnstructured := map[string]interface{}{
-		"operation": "INSERT_FIRST", // preauth should be the first filter in the chain
-		"value": map[string]interface{}{
-			"name": "envoy.filters.http.preauth.ratelimit",
-			"typed_config": map[string]interface{}{
-				"@type":             "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit",
-				"domain":            "preauth",
-				"stage":             kuadrantistioutils.PreAuthStage,
-				"failure_mode_deny": true,
-				// If not specified, returns success immediately (can be useful for us)
-				"rate_limit_service": map[string]interface{}{
-					"transport_api_version": "V3",
-					"grpc_service": map[string]interface{}{
-						"timeout": "3s",
-						"envoy_grpc": map[string]string{
-							"cluster_name": kuadrantistioutils.PatchedLimitadorClusterName,
+// updateEnvoyFilter returns an EnvoyFilter resource that patches in order:
+// - Pre-Authorization ratelimit wasm filter
+// - Post-Authorization ratelimit wasm filter
+// - Limitador cluster (tmp-fix)
+// - Wasm cluster
+func updateEnvoyFilter(ctx context.Context, existingObj *istio.EnvoyFilter, rlp *apimv1alpha1.RateLimitPolicy, gwKey client.ObjectKey, gwLabels map[string]string) error {
+	logger := logr.FromContext(ctx)
+
+	rlpKey := client.ObjectKeyFromObject(rlp)
+
+	preAuthPluginPolicy := kuadrantistioutils.PluginPolicyFromRateLimitPolicy(rlp, apimv1alpha1.RateLimitStagePREAUTH)
+	postAuthPluginPolicy := kuadrantistioutils.PluginPolicyFromRateLimitPolicy(rlp, apimv1alpha1.RateLimitStagePOSTAUTH)
+
+	finalPatches := []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{}
+
+	// first time creating the EnvoyFilter i.e. wasm filters.
+	// newly initialised object should have name field as empty string.
+	if existingObj.Name == "" {
+		logger.Info("Initialising EnvoyFilter")
+
+		preAuthPluginConfig := kuadrantistioutils.PluginConfig{
+			FailureModeDeny: true,
+			PluginPolicies: map[string]kuadrantistioutils.PluginPolicy{
+				rlpKey.String(): *preAuthPluginPolicy,
+			},
+		}
+		preAuthJSON, err := json.Marshal(preAuthPluginConfig)
+		if err != nil {
+			return fmt.Errorf("failed to marshall preauth plugin config into json")
+		}
+
+		postAuthPluginConfig := kuadrantistioutils.PluginConfig{
+			FailureModeDeny: true,
+			PluginPolicies: map[string]kuadrantistioutils.PluginPolicy{
+				rlpKey.String(): *postAuthPluginPolicy,
+			},
+		}
+		postAuthJSON, err := json.Marshal(postAuthPluginConfig)
+		if err != nil {
+			return fmt.Errorf("failed to marshall preauth plugin config into json")
+		}
+
+		patchUnstructured := map[string]interface{}{
+			"operation": "INSERT_FIRST", // preauth should be the first filter in the chain
+			"value": map[string]interface{}{
+				"name": "envoy.filters.http.preauth.wasm",
+				"typed_config": map[string]interface{}{
+					"@type":   "type.googleapis.com/udpa.type.v1.TypedStruct",
+					"typeUrl": "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm",
+					"value": map[string]interface{}{
+						"config": map[string]interface{}{
+							"configuration": map[string]interface{}{
+								"@type": "type.googleapis.com/google.protobuf.StringValue",
+								"value": string(preAuthJSON),
+							},
+							"name": "preauth-wasm",
+							"vm_config": map[string]interface{}{
+								"code": map[string]interface{}{
+									"remote": map[string]interface{}{
+										"http_uri": map[string]interface{}{
+											"uri":     "https://raw.githubusercontent.com/rahulanand16nov/wasm-shim/new-api/deploy/wasm_shim.wasm",
+											"cluster": kuadrantistioutils.PatchedWasmClusterName,
+											"timeout": "10s",
+										},
+										"sha256": "04aa04c9c16ba4557a05d2f3a356f1ff76676a5a9ee2dde41716db3919077df6",
+									},
+								},
+								"allow_precompiled": true,
+								"runtime":           "envoy.wasm.runtime.v8",
+							},
 						},
 					},
 				},
 			},
-		},
-	}
+		}
 
-	patchRaw, _ := json.Marshal(patchUnstructured)
-	prePatch := networkingv1alpha3.EnvoyFilter_Patch{}
-	if err := prePatch.UnmarshalJSON(patchRaw); err != nil {
-		return nil, err
-	}
+		patchRaw, _ := json.Marshal(patchUnstructured)
+		prePatch := networkingv1alpha3.EnvoyFilter_Patch{}
+		if err := prePatch.UnmarshalJSON(patchRaw); err != nil {
+			return err
+		}
 
-	postPatch := prePatch.DeepCopy()
-	postPatch.Value.Fields["name"] = &types.Value{
-		Kind: &types.Value_StringValue{
-			StringValue: "envoy.filters.http.postauth.ratelimit",
-		},
-	}
+		postPatch := prePatch.DeepCopy()
 
-	// update domain for postauth filter
-	postPatch.Value.Fields["typed_config"].GetStructValue().Fields["domain"] = &types.Value{
-		Kind: &types.Value_StringValue{
-			StringValue: "postauth",
-		},
-	}
-	// update stage for postauth filter
-	postPatch.Value.Fields["typed_config"].GetStructValue().Fields["stage"] = &types.Value{
-		Kind: &types.Value_NumberValue{
-			NumberValue: float64(kuadrantistioutils.PostAuthStage),
-		},
-	}
-	// update operation for postauth filter
-	postPatch.Operation = networkingv1alpha3.EnvoyFilter_Patch_INSERT_BEFORE
+		// update filter name
+		postPatch.Value.Fields["name"] = &types.Value{
+			Kind: &types.Value_StringValue{
+				StringValue: "envoy.filters.http.postauth.wasm",
+			},
+		}
 
-	preAuthFilterPatch := &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
-		ApplyTo: networkingv1alpha3.EnvoyFilter_HTTP_FILTER,
-		Match: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
-			Context: networkingv1alpha3.EnvoyFilter_GATEWAY,
-			ObjectTypes: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
-				Listener: &networkingv1alpha3.EnvoyFilter_ListenerMatch{
-					PortNumber: EnvoysHTTPPortNumber, // Kuadrant-gateway listens on this port by default
-					FilterChain: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
-						Filter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
-							Name: EnvoysHTTPConnectionManagerName,
+		// update operation for postauth filter
+		postPatch.Operation = networkingv1alpha3.EnvoyFilter_Patch_INSERT_BEFORE
+
+		pluginConfig := postPatch.Value.Fields["typed_config"].GetStructValue().Fields["value"].GetStructValue().Fields["config"]
+
+		// update plugin config for postauth filter
+		pluginConfig.GetStructValue().Fields["configuration"].GetStructValue().Fields["value"] = &types.Value{
+			Kind: &types.Value_StringValue{
+				StringValue: string(postAuthJSON),
+			},
+		}
+
+		// update plugin name
+		pluginConfig.GetStructValue().Fields["name"] = &types.Value{
+			Kind: &types.Value_StringValue{
+				StringValue: "postauth-wasm",
+			},
+		}
+
+		preAuthFilterPatch := &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
+			ApplyTo: networkingv1alpha3.EnvoyFilter_HTTP_FILTER,
+			Match: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
+				Context: networkingv1alpha3.EnvoyFilter_GATEWAY,
+				ObjectTypes: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
+					Listener: &networkingv1alpha3.EnvoyFilter_ListenerMatch{
+						PortNumber: EnvoysHTTPPortNumber, // Kuadrant-gateway listens on this port by default
+						FilterChain: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
+							Filter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
+								Name: EnvoysHTTPConnectionManagerName,
+							},
 						},
 					},
 				},
 			},
-		},
-		Patch: &prePatch,
-	}
+			Patch: &prePatch,
+		}
 
-	postAuthFilterPatch := preAuthFilterPatch.DeepCopy()
-	postAuthFilterPatch.Patch = postPatch
+		postAuthFilterPatch := preAuthFilterPatch.DeepCopy()
+		postAuthFilterPatch.Patch = postPatch
 
-	// postauth filter should be injected just before the router filter
-	postAuthFilterPatch.Match.ObjectTypes = &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
-		Listener: &networkingv1alpha3.EnvoyFilter_ListenerMatch{
-			PortNumber: EnvoysHTTPPortNumber,
-			FilterChain: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
-				Filter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
-					Name: EnvoysHTTPConnectionManagerName,
-					SubFilter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_SubFilterMatch{
-						Name: "envoy.filters.http.router",
+		// postauth filter should be injected just before the router filter
+		postAuthFilterPatch.Match.ObjectTypes = &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
+			Listener: &networkingv1alpha3.EnvoyFilter_ListenerMatch{
+				PortNumber: EnvoysHTTPPortNumber,
+				FilterChain: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
+					Filter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
+						Name: EnvoysHTTPConnectionManagerName,
+						SubFilter: &networkingv1alpha3.EnvoyFilter_ListenerMatch_SubFilterMatch{
+							Name: "envoy.filters.http.router",
+						},
 					},
 				},
 			},
-		},
-	}
+		}
 
-	// Eventually, this should be dropped since it's a temp-fix for Kuadrant/limitador#53
-	clusterPatch := kuadrantistioutils.LimitadorClusterEnvoyPatch()
+		// since it's the first time, add the Limitador and Wasm cluster into the patches
+		finalPatches = append(finalPatches, preAuthFilterPatch, postAuthFilterPatch,
+			kuadrantistioutils.LimitadorClusterEnvoyPatch(), kuadrantistioutils.WasmClusterEnvoyPatch())
+	} else {
+		logger.Info("Updating EnvoyFilter")
 
-	factory := kuadrantistioutils.EnvoyFilterFactory{
-		ObjectName: rlFiltersPatchName(gwKey.Name),
-		Namespace:  gwKey.Namespace,
-		Patches: []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
-			preAuthFilterPatch,
-			postAuthFilterPatch,
-			clusterPatch,
-		},
-		Labels: gwLabels,
-	}
+		// use the old patches but update the wasm plugin configs
+		finalPatches = append(finalPatches, existingObj.Spec.ConfigPatches...)
+		for stage := 0; stage < 2; stage++ {
+			patchValue := finalPatches[stage].Patch.Value
+			pluginConfig := patchValue.Fields["typed_config"].GetStructValue().Fields["value"].GetStructValue().Fields["config"]
+			pluginConfigString := pluginConfig.GetStructValue().Fields["configuration"].GetStructValue().Fields["value"].GetStringValue()
 
-	return factory.EnvoyFilter(), nil
-}
+			parsedPluginConfig := &kuadrantistioutils.PluginConfig{}
+			if err := json.Unmarshal([]byte(pluginConfigString), parsedPluginConfig); err != nil {
+				return fmt.Errorf("failed to unmarshall existing plugin config")
+			}
 
-func desiredRatelimitsEnvoyFilter(rlp *apimv1alpha1.RateLimitPolicy, vHostNames []string, gwKey, networkingKey client.ObjectKey, gwLabels map[string]string) *istio.EnvoyFilter {
-	patches := make([]*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, 0)
-
-	// route-level patches
-	for _, host := range vHostNames {
-		// TODO(eguzki): The VirtualHost name is generated by envoy from the
-		// Virtualservice domain + gateway port information
-		// Instead of harcoding, it should be read from the Gateway object.
-		vHostName := host + ":80" // Istio names virtual host in this format: host + port
-		vhPatch := virtualHostRateLimitsPatch(vHostName, rlp.Spec.RateLimits)
-		patches = append(patches, vhPatch)
-
-		for _, route := range rlp.Spec.Routes {
-			routePatch := routeRateLimitsPatch(vHostName, route.Name, route.RateLimits)
-			patches = append(patches, routePatch)
+			if parsedPluginConfig.PluginPolicies == nil {
+				parsedPluginConfig.PluginPolicies = make(map[string]kuadrantistioutils.PluginPolicy)
+			}
+			parsedPluginConfig.PluginPolicies[rlpKey.String()] = *preAuthPluginPolicy
+			if stage == 1 {
+				parsedPluginConfig.PluginPolicies[rlpKey.String()] = *postAuthPluginPolicy
+			}
 		}
 	}
 
 	factory := kuadrantistioutils.EnvoyFilterFactory{
-		ObjectName: ratelimitsPatchName(gwKey.Name, networkingKey),
+		ObjectName: rlFiltersPatchName(gwKey.Name),
 		Namespace:  gwKey.Namespace,
-		Patches:    patches,
+		Patches:    finalPatches,
 		Labels:     gwLabels,
 	}
 
-	return factory.EnvoyFilter()
-}
+	*existingObj = *factory.EnvoyFilter()
 
-func routeRateLimitsPatch(vHostName string, routeName string, rateLimits []*apimv1alpha1.RateLimit) *networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
-	// A patch example would look like this:
-	//
-	//applyTo: HTTP_ROUTE
-	//match:
-	//  context: GATEWAY
-	//  routeConfiguration:
-	//    vhost:
-	//	    name: api.animaltoys.127.0.0.1.nip.io:80
-	//	    route:
-	//	      name: getToys
-	//patch:
-	//  operation: MERGE
-	//  value:
-	//    route:
-	//      rate_limits:
-	//	      - stage: 0
-	//		    actions:
-	//            - request_headers:
-	//                header_name: ":path"
-	//                descriptor_key: "req.path"
-	//            - request_headers:
-	//                header_name: ":method"
-	//                descriptor_key: "req.method"
-
-	patchUnstructured := map[string]interface{}{
-		"operation": "MERGE",
-		"value": map[string]interface{}{
-			"route": map[string]interface{}{
-				"rate_limits": kuadrantistioutils.EnvoyFilterRatelimitsUnstructured(rateLimits),
-			},
-		},
-	}
-
-	patchRaw, _ := json.Marshal(patchUnstructured)
-	patch := &networkingv1alpha3.EnvoyFilter_Patch{}
-	if err := patch.UnmarshalJSON(patchRaw); err != nil {
-		//TODO(eguzki): handle error
-		panic(err)
-	}
-
-	return &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
-		ApplyTo: networkingv1alpha3.EnvoyFilter_HTTP_ROUTE,
-		Match: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
-			Context: networkingv1alpha3.EnvoyFilter_GATEWAY,
-			ObjectTypes: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
-				RouteConfiguration: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch{
-					Vhost: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
-						Name: vHostName,
-						Route: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch_RouteMatch{
-							Name: routeName,
-						},
-					},
-				},
-			},
-		},
-		Patch: patch,
-	}
-}
-
-func virtualHostRateLimitsPatch(vHostName string, rateLimits []*apimv1alpha1.RateLimit) *networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
-	// A patch example would look like this:
-	//
-	// applyTo: VIRTUAL_HOST
-	// match:
-	//   context: GATEWAY
-	//   routeConfiguration:
-	//     vhost:
-	// 	    name: api.animaltoys.127.0.0.1.nip.io:80
-	// 	    route:
-	// 	      name: getToys
-	// patch:
-	//   operation: MERGE
-	//   value:
-	//     rate_limits:
-	// 	    - stage: 0
-	// 	      actions:
-	//           - request_headers:
-	//               header_name: ":path"
-	//               descriptor_key: "req.path"
-	//           - request_headers:
-	//               header_name: ":method"
-	//               descriptor_key: "req.method"
-	//     typed_per_filter_config:
-	//       envoy.filters.http.ratelimit:
-	//         @type: "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute"
-	//         vh_rate_limits: INCLUDE
-	patchUnstructured := map[string]interface{}{
-		"operation": "MERGE",
-		"value": map[string]interface{}{
-			"rate_limits": kuadrantistioutils.EnvoyFilterRatelimitsUnstructured(rateLimits),
-			"typed_per_filter_config": map[string]interface{}{
-				// Note the following name is different from what we have given to our pre/post-auth
-				// ratelimit filters. It's because you refer to the type of filter and not the name field
-				// of the filter. This infers it's configured for both filters in our case.
-				"envoy.filters.http.ratelimit": map[string]interface{}{
-					"@type":          "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute",
-					"vh_rate_limits": "INCLUDE",
-				},
-			},
-		},
-	}
-
-	patchRaw, _ := json.Marshal(patchUnstructured)
-	patch := &networkingv1alpha3.EnvoyFilter_Patch{}
-	if err := patch.UnmarshalJSON(patchRaw); err != nil {
-		//TODO(eguzki): handle error
-		panic(err)
-	}
-
-	return &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
-		ApplyTo: networkingv1alpha3.EnvoyFilter_VIRTUAL_HOST,
-		Match: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
-			Context: networkingv1alpha3.EnvoyFilter_GATEWAY,
-			ObjectTypes: &networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
-				RouteConfiguration: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch{
-					Vhost: &networkingv1alpha3.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
-						Name: vHostName,
-					},
-				},
-			},
-		},
-		Patch: patch,
-	}
+	logger.Info("successfully created/updated EnvoyFilter")
+	return nil
 }
 
 func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
