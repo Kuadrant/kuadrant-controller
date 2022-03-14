@@ -281,6 +281,20 @@ local-setup: local-cleanup local-setup-kind manifests kustomize generate
 .PHONY: local-env-setup
 local-env-setup: local-cleanup local-setup-kind deploy-kuadrant-deps generate install
 
+# Deploys all services and manifests required by kuadrant to run
+# kuadrant is not deployed
+.PHONY: openshift-env-setup
+openshift-env-setup: openshift-cleanup openshift-init deploy-kuadrant-deps generate install
+
+.PHONY: openshift-init
+openshift-init:
+	oc adm policy add-scc-to-group anyuid system:serviceaccounts:$(KUADRANT_NAMESPACE)
+
+.PHONY: openshift-cleanup
+openshift-cleanup:
+	-oc adm policy remove-scc-from-group anyuid system:serviceaccounts:$(KUADRANT_NAMESPACE)
+	-kubectl delete namespace "$(KUADRANT_NAMESPACE)"
+
 .PHONY: deploy-kuadrant-deps
 deploy-kuadrant-deps:
 	./utils/local-deployment/deploy-kuadrant-deps.sh
