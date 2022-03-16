@@ -16,19 +16,16 @@ spec:
             - generic_key:
                 descriptor_key: get-toy
                 descriptor_value: "yes"
-            - generic_key:
-                descriptor_key: other-get-toy
-                descriptor_value: "yes"
     - name: add-toy
       rateLimits:
-        - stage: POSTAUTH
+        - stage: BOTH
           actions:
             - generic_key:
                 descriptor_key: add-toy
                 descriptor_value: "yes"
     - name: delete-toy
       rateLimits:
-        - stage: PREAUTH
+        - stage: BOTH
           actions:
             - generic_key:
                 descriptor_key: delete-toy
