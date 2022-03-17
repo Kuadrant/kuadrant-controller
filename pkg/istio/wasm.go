@@ -6,7 +6,7 @@ import (
 
 // wasm-shim API structs
 type Rule struct {
-	Operation *apimv1alpha1.Operation         `json:"operation"`
+	Operation []*apimv1alpha1.Operation       `json:"operation"`
 	Actions   []*apimv1alpha1.ActionSpecifier `json:"actions"`
 }
 
