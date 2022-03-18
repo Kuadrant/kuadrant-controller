@@ -6,8 +6,8 @@ import (
 
 // wasm-shim API structs
 type Rule struct {
-	Operation []*apimv1alpha1.Operation       `json:"operation"`
-	Actions   []*apimv1alpha1.ActionSpecifier `json:"actions"`
+	Operations []*apimv1alpha1.Operation       `json:"operations"`
+	Actions    []*apimv1alpha1.ActionSpecifier `json:"actions"`
 }
 
 type PluginPolicy struct {
@@ -41,10 +41,10 @@ func PluginPolicyFromRateLimitPolicy(rlp *apimv1alpha1.RateLimitPolicy, pluginSt
 			}
 		}
 
-		if rlpRule.Operation != nil {
+		if len(rlpRule.Operations) > 0 {
 			pluginRule := &Rule{
-				Operation: rlpRule.Operation,
-				Actions:   actions,
+				Operations: rlpRule.Operations,
+				Actions:    actions,
 			}
 			pluginPolicy.Rules = append(pluginPolicy.Rules, pluginRule)
 		}

@@ -327,7 +327,7 @@ func updateEnvoyFilter(ctx context.Context, existingObj *istio.EnvoyFilter, rlp 
 											"cluster": kuadrantistioutils.PatchedWasmClusterName,
 											"timeout": "10s",
 										},
-										"sha256": "3cd8e4e9cdf6caad21fb3489d8bf16257809389fe5191909452e85804af83d01",
+										"sha256": "c538dc0e5bf68bb88358acc513a3f19f75bc7e49cd7accf1b33ac0cb7b548ce0",
 										"retry_policy": map[string]interface{}{
 											"num_retries": 10,
 										},
@@ -507,7 +507,7 @@ func fetchOperationsFromVS(vs *networkingv1alpha3.VirtualService, rlp *apimv1alp
 							operation.Methods = append(operation.Methods, normalizedMethod)
 						}
 
-						rule.Operation = append(rule.Operation, &operation)
+						rule.Operations = append(rule.Operations, &operation)
 					}
 				}
 			}

@@ -118,7 +118,7 @@ type Rule struct {
 	Name string `json:"name,omitempty"`
 	// Operation specifies the operations of a request
 	// +optional
-	Operation []*Operation `json:"operations,omitempty"`
+	Operations []*Operation `json:"operations,omitempty"`
 	// +optional
 	RateLimits []*RateLimit `json:"rateLimits,omitempty"`
 }
