@@ -103,6 +103,7 @@ type RateLimit struct {
 	Actions []*ActionSpecifier `json:"actions,omitempty"`
 }
 
+// Each operation type has OR semantics and overall AND semantics for a match.
 type Operation struct {
 	Paths   []string `json:"paths,omitempty"`
 	Methods []string `json:"methods,omitempty"`
@@ -110,17 +111,21 @@ type Operation struct {
 }
 
 type Rule struct {
+	// Name supports regex for fetching operations from routing resources
+	// For VirtualService, if route name matches, all the match requests are
+	// converted to operations internally. But specific match request names
+	// are also supported.
 	Name string `json:"name,omitempty"`
 	// Operation specifies the operations of a request
 	// +optional
-	Operation *Operation `json:"operation,omitempty"`
+	Operations []*Operation `json:"operations,omitempty"`
 	// +optional
 	RateLimits []*RateLimit `json:"rateLimits,omitempty"`
 }
 
 // RateLimitPolicySpec defines the desired state of RateLimitPolicy
 type RateLimitPolicySpec struct {
-	Rules []Rule `json:"rules,omitempty"`
+	Rules []*Rule `json:"rules,omitempty"`
 	// +optional
 	RateLimits []*RateLimit                      `json:"rateLimits,omitempty"`
 	Domain     string                            `json:"domain"`

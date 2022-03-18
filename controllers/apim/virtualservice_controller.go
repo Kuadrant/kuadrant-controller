@@ -11,7 +11,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 
-	networkingv1alpha3 "istio.io/api/networking/v1alpha3"
 	securityv1beta1 "istio.io/api/security/v1beta1"
 	istionetworkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istiosecurityv1beta1 "istio.io/client-go/pkg/apis/security/v1beta1"
@@ -144,17 +143,6 @@ func (r *VirtualServiceReconciler) reconcileAuthPolicy(ctx context.Context, logg
 
 	logger.Info("successfully created/updated AuthorizationPolicy resource(s)")
 	return nil
-}
-
-func normalizeStringMatch(sm *networkingv1alpha3.StringMatch) string {
-	if prefix := sm.GetPrefix(); prefix != "" {
-		return prefix + "*"
-	}
-	if exact := sm.GetExact(); exact != "" {
-		return exact
-	}
-	// Regex string match is not supported because authpolicy doesn't as well.
-	return ""
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -5,30 +5,22 @@ metadata:
   name: toystore
 spec:
   rules:
-    - name: get-toy
-      operation:
-        paths: ["/toy"]
-        methods: ["GET"]
-        hosts: ["*.toystore.com"]
+    - operations:
+        - paths: ["/toy"]
+          methods: ["GET"]
+          hosts: ["*.toystore.com"]
       rateLimits:
         - stage: BOTH
           actions:
             - generic_key:
                 descriptor_key: get-toy
                 descriptor_value: "yes"
-    - name: add-toy
+    - name: admin*
       rateLimits:
-        - stage: BOTH
+        - stage: POSTAUTH
           actions:
             - generic_key:
-                descriptor_key: add-toy
-                descriptor_value: "yes"
-    - name: delete-toy
-      rateLimits:
-        - stage: BOTH
-          actions:
-            - generic_key:
-                descriptor_key: delete-toy
+                descriptor_key: admin
                 descriptor_value: "yes"
   rateLimits:
     - stage: PREAUTH
@@ -43,7 +35,7 @@ spec:
       namespace: toystore-app
       seconds: 30
       variables: []
-    - conditions: ["add-toy == yes"]
+    - conditions: ["admin == yes"]
       max_value: 2
       namespace: toystore-app
       seconds: 30
