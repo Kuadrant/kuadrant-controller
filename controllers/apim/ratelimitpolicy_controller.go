@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 
 	"github.com/go-logr/logr"
 	"github.com/gogo/protobuf/types"
@@ -169,6 +170,8 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 			return ctrl.Result{}, err
 		}
 
+		fetchOperationsFromVS(&vs.Spec, &rlp.Spec)
+
 		if err := r.attachToNetwork(ctx, vs.Spec.Gateways, vsKey, &rlp); err != nil {
 			logger.Error(err, "failed to attach RateLimitPolicy to VirtualService")
 			return ctrl.Result{}, err
@@ -197,40 +200,25 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 
 func (r *RateLimitPolicyReconciler) detachFromNetwork(ctx context.Context, gateways []string, owner string, rlp *apimv1alpha1.RateLimitPolicy) error {
 	logger := logr.FromContext(ctx)
-	ownerKey := common.NamespacedNameToObjectKey(owner, rlp.Namespace)
 	logger.Info("Detaching RateLimitPolicy from a network")
 
 	for _, gw := range gateways {
 		gwKey := common.NamespacedNameToObjectKey(gw, rlp.Namespace)
 
 		// fetch the filters patch
-		filtersPatchKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: rlFiltersPatchName(gwKey.Name)}
-		filtersPatch := &istio.EnvoyFilter{}
-		// TODO(eastizle): if not found, do not return error. It has already been deleted.
-		if err := r.Client().Get(ctx, filtersPatchKey, filtersPatch); err != nil {
-			logger.Error(err, "failed to get ratelimit filters patch")
-			return err
+		wasmEnvoyFilterKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: rlFiltersPatchName(gwKey.Name)}
+		wasmEnvoyFilter := &istio.EnvoyFilter{}
+		if err := r.Client().Get(ctx, wasmEnvoyFilterKey, wasmEnvoyFilter); err != nil {
+			if !apierrors.IsNotFound(err) {
+				logger.Error(err, "failed to get ratelimit filters patch")
+				return err
+			}
+			return nil
 		}
 
 		// remove the parentRef entry on filters patch
-		if err := r.removeParentRefEntry(ctx, filtersPatch, owner); err != nil {
+		if err := r.removeParentRefEntry(ctx, wasmEnvoyFilter, owner); err != nil {
 			logger.Error(err, "failed to remove parentRef entry on the ratelimit filters patch")
-			return err
-		}
-		logger.Info("successfully deleted/updated ratelimit filters patch")
-
-		// fetch the ratelimits patch
-		ratelimitsPatchKey := client.ObjectKey{Namespace: gwKey.Namespace, Name: ratelimitsPatchName(gwKey.Name, ownerKey)}
-		ratelimitsPatch := &istio.EnvoyFilter{}
-		// TODO(eastizle): if not found, do not return error. It has already been deleted.
-		if err := r.Client().Get(ctx, ratelimitsPatchKey, ratelimitsPatch); err != nil {
-			logger.Error(err, "failed to get ratelimits patch")
-			return err
-		}
-
-		// remove the parentRef entry on ratelimits patch
-		if err := r.removeParentRefEntry(ctx, ratelimitsPatch, owner); err != nil {
-			logger.Error(err, "failed to remove parentRef entry on the ratelimits patch")
 			return err
 		}
 		logger.Info("successfully deleted/updated ratelimit filters patch")
@@ -292,7 +280,7 @@ func updateEnvoyFilter(ctx context.Context, existingObj *istio.EnvoyFilter, rlp 
 
 	// first time creating the EnvoyFilter i.e. wasm filters.
 	// newly initialised object should have name field as empty string.
-	if existingObj.Name == "" {
+	if len(existingObj.Name) == 0 {
 		logger.Info("Initialising EnvoyFilter")
 
 		preAuthPluginConfig := kuadrantistioutils.PluginConfig{
@@ -339,7 +327,7 @@ func updateEnvoyFilter(ctx context.Context, existingObj *istio.EnvoyFilter, rlp 
 											"cluster": kuadrantistioutils.PatchedWasmClusterName,
 											"timeout": "10s",
 										},
-										"sha256": "d34ed0e7c0a72a28d890b4620b5754ae6cc3253b86c4dec089a0f80a8b19595a",
+										"sha256": "163f80d9da3fc2ddd3d0d5a847ca6b0fceb94f293ca2f51af2c49000b29ac0ac",
 										"retry_policy": map[string]interface{}{
 											"num_retries": 10,
 										},
@@ -494,6 +482,37 @@ func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *ap
 	}
 	logger.Info("successfully created/updated RateLimit resources")
 	return nil
+}
+
+// fetchOperationsFromVS captures match rules from VirtualService and fill into RateLimitPolicy
+func fetchOperationsFromVS(vs *networkingv1alpha3.VirtualService, rlp *apimv1alpha1.RateLimitPolicySpec) {
+	for _, rule := range rlp.Rules {
+		if len(rule.Name) > 0 {
+			for _, httpRoute := range vs.Http {
+				routeMatched, _ := regexp.MatchString(rule.Name, httpRoute.Name)
+
+				for _, httpMatchReq := range httpRoute.Match {
+					reqMatched, _ := regexp.MatchString(rule.Name, httpMatchReq.Name)
+
+					if routeMatched || reqMatched {
+						operation := apimv1alpha1.Operation{
+							Hosts: vs.Hosts,
+						}
+
+						if normalizedURI := normalizeStringMatch(httpMatchReq.Uri); normalizedURI != "" {
+							operation.Paths = append(operation.Paths, normalizedURI)
+						}
+
+						if normalizedMethod := normalizeStringMatch(httpMatchReq.Method); normalizedMethod != "" {
+							operation.Methods = append(operation.Methods, normalizedMethod)
+						}
+
+						rule.Operations = append(rule.Operations, &operation)
+					}
+				}
+			}
+		}
+	}
 }
 
 func (r *RateLimitPolicyReconciler) attachVSToStatus(ctx context.Context, vs *istio.VirtualService, rlp *apimv1alpha1.RateLimitPolicy) error {
