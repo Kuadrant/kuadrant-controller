@@ -150,23 +150,31 @@ spec:
                 items:
                   properties:
                     name:
+                      description: Name supports regex for fetching operations from
+                        routing resources For VirtualService, if route name matches,
+                        all the match requests are converted to operations internally.
+                        But specific match request names are also supported.
                       type: string
-                    operation:
+                    operations:
                       description: Operation specifies the operations of a request
-                      properties:
-                        hosts:
-                          items:
-                            type: string
-                          type: array
-                        methods:
-                          items:
-                            type: string
-                          type: array
-                        paths:
-                          items:
-                            type: string
-                          type: array
-                      type: object
+                      items:
+                        description: Each operation type has OR semantics and overall
+                          AND semantics for a match.
+                        properties:
+                          hosts:
+                            items:
+                              type: string
+                            type: array
+                          methods:
+                            items:
+                              type: string
+                            type: array
+                          paths:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      type: array
                     rateLimits:
                       items:
                         properties:
