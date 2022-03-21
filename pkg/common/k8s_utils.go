@@ -108,7 +108,7 @@ func GetServicePortNumber(ctx context.Context, k8sClient client.Client, svcKey c
 
 	for _, p := range svc.Spec.Ports {
 		if p.Name == svcPort {
-			return p.Port, nil
+			return int32(p.TargetPort.IntValue()), nil
 		}
 	}
 

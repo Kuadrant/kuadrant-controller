@@ -62,3 +62,21 @@ func Contains(slice []string, target string) bool {
 	}
 	return false
 }
+
+// MergeMapStringString Merge desired into existing.
+func MergeMapStringString(existing *map[string]string, desired map[string]string) bool {
+	modified := false
+
+	if *existing == nil {
+		*existing = map[string]string{}
+	}
+
+	for k, v := range desired {
+		if existingVal, ok := (*existing)[k]; !ok || v != existingVal {
+			(*existing)[k] = v
+			modified = true
+		}
+	}
+
+	return modified
+}
