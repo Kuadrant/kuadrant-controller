@@ -266,6 +266,19 @@ spec:
           status:
             description: RateLimitPolicyStatus defines the observed state of RateLimitPolicy
             properties:
+              httproutes:
+                items:
+                  properties:
+                    gateways:
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               virtualservices:
                 description: VirtualServices represents the current VirtualService
                   objects with reference to this ratelimitpolicy object
@@ -273,15 +286,7 @@ spec:
                   properties:
                     gateways:
                       items:
-                        properties:
-                          name:
-                            type: string
-                          namespace:
-                            type: string
-                        required:
-                        - name
-                        - namespace
-                        type: object
+                        type: string
                       type: array
                     name:
                       type: string

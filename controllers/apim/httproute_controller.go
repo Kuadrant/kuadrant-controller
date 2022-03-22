@@ -91,10 +91,7 @@ func (r *HTTPRouteReconciler) reconcileAuthPolicy(ctx context.Context, logger lo
 	providerName := hr.GetAnnotations()[KuadrantAuthProviderAnnotation]
 
 	// pre-convert hostnames to string slice
-	hosts := []string{}
-	for idx := range hr.Spec.Hostnames {
-		hosts = append(hosts, string(hr.Spec.Hostnames[idx]))
-	}
+	hosts := HostnamesToStrings(hr.Spec.Hostnames)
 
 	// generate rules
 	rules := []*securityv1beta1.Rule{}
@@ -199,4 +196,12 @@ func (r *HTTPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&gatewayapi_v1alpha2.HTTPRoute{}, builder.WithPredicates(routingPredicate(rlpMapper))).
 		WithLogger(log.Log). // use base logger, the manager will add prefixes for watched sources
 		Complete(r)
+}
+
+func HostnamesToStrings(hostnames []gatewayapi_v1alpha2.Hostname) []string {
+	hosts := []string{}
+	for idx := range hostnames {
+		hosts = append(hosts, string(hostnames[idx]))
+	}
+	return hosts
 }
