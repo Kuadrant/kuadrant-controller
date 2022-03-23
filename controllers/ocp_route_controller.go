@@ -72,11 +72,6 @@ func (r *RouteReconciler) Reconcile(eventCtx context.Context, req ctrl.Request) 
 
 	// Route has been marked for deletion
 	if route.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(route, routeFinalizerName) {
-		//err := r.deleteVirtualService(ctx, route)
-		//if err != nil {
-		//	return ctrl.Result{}, err
-		//}
-
 		err := r.deleteAuthPolicy(ctx, route)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -115,10 +110,6 @@ func (r *RouteReconciler) Reconcile(eventCtx context.Context, req ctrl.Request) 
 	routeLabels := route.GetLabels()
 	if kuadrantEnabled, ok := routeLabels[mappers.KuadrantManagedLabel]; !ok || kuadrantEnabled != "true" {
 		// this route used to be kuadrant protected, not anymore
-		//err := r.deleteVirtualService(ctx, route)
-		//if err != nil {
-		//	return ctrl.Result{}, err
-		//}
 
 		err := r.deleteAuthPolicy(ctx, route)
 		if err != nil {
@@ -137,16 +128,6 @@ func (r *RouteReconciler) Reconcile(eventCtx context.Context, req ctrl.Request) 
 
 		return ctrl.Result{}, nil
 	}
-
-	//desiredVS, err := r.desiredVirtualService(ctx, route)
-	//if err != nil {
-	//	return ctrl.Result{}, err
-	//}
-
-	//err = r.ReconcileResource(ctx, &istionetworkingv1alpha3.VirtualService{}, desiredVS, basicVirtualServiceMutator)
-	//if err != nil {
-	//	return ctrl.Result{}, err
-	//}
 
 	desiredAuthPolicy := r.desiredAuthorizationPolicy(route)
 	err := r.ReconcileResource(ctx, &istiosecurityv1beta1.AuthorizationPolicy{}, desiredAuthPolicy, basicAuthPolicyMutator)
@@ -228,60 +209,6 @@ func desiredVSNameFromRoute(route *routev1.Route) string {
 	return fmt.Sprintf("kuadrant-managed-%s-%s", route.Namespace, route.Name)
 }
 
-//func (r *RouteReconciler) desiredVirtualService(ctx context.Context, route *routev1.Route) (*istionetworkingv1alpha3.VirtualService, error) {
-//	routePath := "/"
-//	if route.Spec.Path != "" {
-//		routePath = route.Spec.Path
-//	}
-//
-//	svcKey := client.ObjectKey{
-//		Name:      route.Spec.To.Name,
-//		Namespace: route.Namespace,
-//	}
-//	port, err := common.GetServicePortNumber(ctx, r.Client(), svcKey, route.Spec.Port.TargetPort.String())
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	httpRoutes := []*istioapinetworkingv1alpha3.HTTPRoute{
-//		{
-//			Name: route.Name,
-//			Match: []*istioapinetworkingv1alpha3.HTTPMatchRequest{
-//				{
-//					Uri: kuadrantistio.StringMatch(routePath, kuadrantistio.PathMatchPrefix),
-//				},
-//			},
-//			Route: []*istioapinetworkingv1alpha3.HTTPRouteDestination{
-//				{
-//					Destination: &istioapinetworkingv1alpha3.Destination{
-//						Host: route.Spec.Host,
-//						Port: &istioapinetworkingv1alpha3.PortSelector{
-//							Number: uint32(port),
-//						},
-//					},
-//				},
-//			},
-//		},
-//	}
-//
-//	return &istionetworkingv1alpha3.VirtualService{
-//		TypeMeta: metav1.TypeMeta{
-//			Kind:       "VirtualService",
-//			APIVersion: "networking.istio.io/v1alpha3",
-//		},
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: desiredVSNameFromRoute(route),
-//			// Hardcoded to the kuadrant istio ingress gateway
-//			Namespace:   common.KuadrantNamespace,
-//			Annotations: routeKuadrantAnnotations(route),
-//		},
-//		Spec: istioapinetworkingv1alpha3.VirtualService{
-//			Hosts: []string{route.Spec.Host},
-//			Http:  httpRoutes,
-//		},
-//	}, nil
-//}
-
 func (r *RouteReconciler) desiredAuthorizationPolicy(route *routev1.Route) *istiosecurityv1beta1.AuthorizationPolicy {
 	authPolicy := &istiosecurityv1beta1.AuthorizationPolicy{
 		TypeMeta: metav1.TypeMeta{
@@ -328,26 +255,6 @@ func (r *RouteReconciler) desiredAuthorizationPolicy(route *routev1.Route) *isti
 
 	return authPolicy
 }
-
-//func (r *RouteReconciler) deleteVirtualService(ctx context.Context, route *routev1.Route) error {
-//	vs := &istionetworkingv1alpha3.VirtualService{
-//		TypeMeta: metav1.TypeMeta{
-//			Kind:       "VirtualService",
-//			APIVersion: "networking.istio.io/v1alpha3",
-//		},
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: desiredVSNameFromRoute(route),
-//			// Hardcoded to the kuadrant istio ingress gateway
-//			Namespace: common.KuadrantNamespace,
-//		},
-//	}
-//
-//	if err := r.DeleteResource(ctx, vs); client.IgnoreNotFound(err) != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
 
 func (r *RouteReconciler) deleteAuthPolicy(ctx context.Context, route *routev1.Route) error {
 	authPolicy := &istiosecurityv1beta1.AuthorizationPolicy{
@@ -424,39 +331,6 @@ func routeKuadrantAnnotations(route *routev1.Route) map[string]string {
 
 	return newAnnotations
 }
-
-//func basicVirtualServiceMutator(existingObj, desiredObj client.Object) (bool, error) {
-//	existing, ok := existingObj.(*istionetworkingv1alpha3.VirtualService)
-//	if !ok {
-//		return false, fmt.Errorf("%T is not a *istionetworkingv1alpha3.VirtualService", existingObj)
-//	}
-//	desired, ok := desiredObj.(*istionetworkingv1alpha3.VirtualService)
-//	if !ok {
-//		return false, fmt.Errorf("%T is not a *istionetworkingv1alpha3.VirtualService", desiredObj)
-//	}
-//
-//	updated := false
-//	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
-//		existing.Spec = desired.Spec
-//		updated = true
-//	}
-//
-//	tmpAnnotations := existing.GetAnnotations()
-//	tmpUpdated := common.MergeMapStringString(&tmpAnnotations, desired.GetAnnotations())
-//	if tmpUpdated {
-//		existing.SetAnnotations(tmpAnnotations)
-//		updated = true
-//	}
-//
-//	tmpLabels := existing.GetLabels()
-//	tmpUpdated = common.MergeMapStringString(&tmpLabels, desired.GetLabels())
-//	if tmpUpdated {
-//		existing.SetLabels(tmpLabels)
-//		updated = true
-//	}
-//
-//	return updated, nil
-//}
 
 func basicAuthPolicyMutator(existingObj, desiredObj client.Object) (bool, error) {
 	existing, ok := existingObj.(*istiosecurityv1beta1.AuthorizationPolicy)
@@ -569,7 +443,6 @@ func (r *RouteReconciler) desiredLimitadorRateLimts(ctx context.Context, route *
 		return nil, nil
 	}
 
-	fmt.Println("=============== desiredLimitadorRateLimts")
 	rlpKey := client.ObjectKey{Name: rlpName, Namespace: route.Namespace}
 	rlp := &apimv1alpha1.RateLimitPolicy{}
 	if err := r.Client().Get(ctx, rlpKey, rlp); err != nil {
