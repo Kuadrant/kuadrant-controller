@@ -61,8 +61,6 @@ type SignalingNetwork struct {
 	NetworkKind string
 	// Gateways attached to the routing resource
 	Gateways []string
-	// Hosts attached to the routing resource
-	Hosts []string
 }
 
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=ratelimitpolicies,verbs=get;list;watch;create;update;patch;delete
@@ -190,7 +188,6 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 
 		addNetwork = &SignalingNetwork{
 			Gateways:    vs.Spec.Gateways,
-			Hosts:       vs.Spec.Hosts,
 			NetworkName: vsName,
 			NetworkKind: common.VirtualServiceKind,
 		}
@@ -220,7 +217,6 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 		}
 		addNetwork = &SignalingNetwork{
 			Gateways:    gws,
-			Hosts:       HostnamesToStrings(hr.Spec.Hostnames),
 			NetworkName: hrName,
 			NetworkKind: common.HTTPRouteKind,
 		}
