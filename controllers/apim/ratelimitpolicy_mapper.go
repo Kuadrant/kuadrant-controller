@@ -97,6 +97,7 @@ func SignalUpdate(oldObj, newObj client.Object) {
 	}
 }
 
+// SendSignal retrieves RateLimitPolicy and add the network change annotations.
 func SendSignal(ctx context.Context, K8sClient client.Client, routingObj client.Object) error {
 	logger := logr.FromContext(ctx)
 	logger.Info("sending signal to RateLimitPolicy")
