@@ -41,6 +41,13 @@ func (r *HTTPRouteReconciler) Reconcile(eventCtx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
+	if _, present := httproute.GetAnnotations()[KuadrantRateLimitPolicyAnnotation]; present {
+		if err := SendSignal(ctx, r.Client(), &httproute); err != nil {
+			logger.Error(err, "failed to send signal to RateLimitPolicy")
+			return ctrl.Result{}, err
+		}
+	}
+
 	// TODO(rahulanand16nov): handle HTTPRoute deletion for AuthPolicy
 	// check if this httproute has to be protected or not.
 	_, present := httproute.GetAnnotations()[KuadrantAuthProviderAnnotation]
@@ -188,12 +195,8 @@ func (r *HTTPRouteReconciler) reconcileAuthPolicy(ctx context.Context, logger lo
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *HTTPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	rlpMapper := &rateLimitPolicyMapper{
-		K8sClient: r.Client(),
-		Logger:    r.Logger(),
-	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&gatewayapi_v1alpha2.HTTPRoute{}, builder.WithPredicates(routingPredicate(rlpMapper))).
+		For(&gatewayapi_v1alpha2.HTTPRoute{}, builder.WithPredicates(RoutingPredicate())).
 		WithLogger(log.Log). // use base logger, the manager will add prefixes for watched sources
 		Complete(r)
 }
