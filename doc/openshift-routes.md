@@ -1,3 +1,6 @@
+This guide shows how to apply API protection (authZ and rate limiting) on Openshift Routes.
+The protected API service must be part of the Istio's mesh injecting a sidecar in the service's pod.
+
 ### Installing Istio in openshift
 
 [Official doc: Istio on Openshift](https://istio.io/latest/docs/setup/platform-setup/openshift/)
@@ -50,6 +53,7 @@ kubectl apply -n "${KUADRANT_NAMESPACE}" -f utils/local-deployment/limitador.yam
 
 kubectl -n "${KUADRANT_NAMESPACE}" wait --timeout=300s --for=condition=Available deployments --all
 
+# Run locally the kuadrant controller
 make run
 ```
 
@@ -59,7 +63,16 @@ make run
 
 ```
 oc new-project myns
+
 oc adm policy add-scc-to-group anyuid system:serviceaccounts:myns
+
+oc apply -n myns -f - <<EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: istio-cni
+EOF
+
 oc apply -f examples/toystore/toystore.yaml
 ```
 
@@ -76,10 +89,10 @@ export TOYSTORE_DOMAIN="toystore.example.com"
 oc expose svc/toystore --hostname "${TOYSTORE_DOMAIN}"
 ```
 
-#### Add kuadrant label to the route
+Verify that the route has been created
 
 ```
-oc label route toystore kuadrant.io/managed=true
+oc get route toystore -o yaml
 ```
 
 Verify that we can reach our example deployment
@@ -89,6 +102,12 @@ curl -v http://${TOYSTORE_DOMAIN}/toy
 ```
 
 #### Add authZ
+
+Add kuadrant label to the route
+
+```
+oc label route toystore kuadrant.io/managed=true
+```
 
 Create AuthConfig for Authorino external authz provider
 
@@ -193,9 +212,21 @@ spec:
 EOF
 ```
 
-Annotate VirtualService with RateLimitPolicy name to trigger EnvoyFilters creation.
+Annotate the route with RateLimitPolicy name to trigger EnvoyFilters creation.
 
 ```
 kubectl annotate route toystore kuadrant.io/ratelimitpolicy=toystore
 ```
 
+Verify rate limit. 2 times and should be rate limited
+
+```
+curl -v http://${TOYSTORE_DOMAIN}/toy
+```
+
+### Clean up resources
+
+```
+oc adm policy remove-scc-from-group anyuid system:serviceaccounts:myns
+oc delete project myns
+```
