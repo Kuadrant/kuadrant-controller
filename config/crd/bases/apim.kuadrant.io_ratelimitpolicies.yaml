@@ -161,10 +161,6 @@ spec:
                         description: Each operation type has OR semantics and overall
                           AND semantics for a match.
                         properties:
-                          hosts:
-                            items:
-                              type: string
-                            type: array
                           methods:
                             items:
                               type: string

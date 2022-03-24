@@ -548,9 +548,7 @@ func fetchOperationsFromVS(vs *networkingv1alpha3.VirtualService, rlp *apimv1alp
 					reqMatched, _ := regexp.MatchString(rule.Name, httpMatchReq.Name)
 
 					if routeMatched || reqMatched {
-						operation := apimv1alpha1.Operation{
-							Hosts: vs.Hosts,
-						}
+						operation := apimv1alpha1.Operation{}
 
 						if normalizedURI := normalizeStringMatch(httpMatchReq.Uri); normalizedURI != "" {
 							operation.Paths = append(operation.Paths, normalizedURI)

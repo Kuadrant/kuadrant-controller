@@ -105,7 +105,6 @@ type RateLimit struct {
 type Operation struct {
 	Paths   []string `json:"paths,omitempty"`
 	Methods []string `json:"methods,omitempty"`
-	Hosts   []string `json:"hosts,omitempty"`
 }
 
 type Rule struct {
