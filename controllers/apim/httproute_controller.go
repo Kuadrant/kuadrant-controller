@@ -41,7 +41,10 @@ func (r *HTTPRouteReconciler) Reconcile(eventCtx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	if _, present := httproute.GetAnnotations()[KuadrantRateLimitPolicyAnnotation]; present {
+	// check if we have to send any signal to the RateLimitPolicy
+	_, toAttach := httproute.GetAnnotations()[KuadrantAttachNetwork]
+	_, toDetach := httproute.GetAnnotations()[KuadrantDetachNetwork]
+	if toAttach || toDetach {
 		if err := SendSignal(ctx, r.Client(), &httproute); err != nil {
 			logger.Error(err, "failed to send signal to RateLimitPolicy")
 			return ctrl.Result{}, err

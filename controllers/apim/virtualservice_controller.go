@@ -45,13 +45,15 @@ func (r *VirtualServiceReconciler) Reconcile(eventCtx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	if _, present := virtualService.GetAnnotations()[KuadrantRateLimitPolicyAnnotation]; present {
+	// check if we have to send any signal to the RateLimitPolicy
+	_, toAttach := virtualService.GetAnnotations()[KuadrantAttachNetwork]
+	_, toDetach := virtualService.GetAnnotations()[KuadrantDetachNetwork]
+	if toAttach || toDetach {
 		if err := SendSignal(ctx, r.Client(), &virtualService); err != nil {
 			logger.Error(err, "failed to send signal to RateLimitPolicy")
 			return ctrl.Result{}, err
 		}
 	}
-
 	// TODO(rahulanand16nov): handle VirtualService deletion for AuthPolicy
 	// check if this virtualservice is to be protected or not.
 	_, present := virtualService.GetAnnotations()[KuadrantAuthProviderAnnotation]
