@@ -8,7 +8,6 @@ spec:
     - operations:
         - paths: ["/toy"]
           methods: ["GET"]
-          hosts: ["*.toystore.com"]
       rateLimits:
         - stage: BOTH
           actions:
