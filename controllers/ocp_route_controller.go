@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/gogo/protobuf/types"
-	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	istioapinetworkingv1alpha3 "istio.io/api/networking/v1alpha3"
 	securityv1beta1 "istio.io/api/security/v1beta1"
@@ -193,20 +192,12 @@ func kuadrantRoutePredicate() predicate.Predicate {
 	}
 }
 
-func desiredLimitadorRateLimitNameFromRLP(rlpKey client.ObjectKey, idx int) string {
-	return fmt.Sprintf("rlp-%s-%s-%d", rlpKey.Namespace, rlpKey.Name, idx)
-}
-
 func desiredRateLimitFilterEnvoyFilterName() string {
 	return "kuadrant-ratelimit-http-filter"
 }
 
 func desiredRateLimitDescriptorsEnvoyFilterName(route *routev1.Route) string {
 	return fmt.Sprintf("route-%s", route.Name)
-}
-
-func desiredVSNameFromRoute(route *routev1.Route) string {
-	return fmt.Sprintf("kuadrant-managed-%s-%s", route.Namespace, route.Name)
 }
 
 func (r *RouteReconciler) desiredAuthorizationPolicy(route *routev1.Route) *istiosecurityv1beta1.AuthorizationPolicy {
@@ -313,25 +304,6 @@ func (r *RouteReconciler) deleteRateLimitDescriptorsEnvoyFilter(ctx context.Cont
 	return nil
 }
 
-func routeKuadrantAnnotations(route *routev1.Route) map[string]string {
-	annotations := route.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	newAnnotations := make(map[string]string)
-
-	if providerName, ok := annotations[mappers.KuadrantAuthProviderAnnotation]; ok {
-		newAnnotations[mappers.KuadrantAuthProviderAnnotation] = providerName
-	}
-
-	if val, ok := annotations[mappers.KuadrantRateLimitPolicyAnnotation]; ok {
-		newAnnotations[mappers.KuadrantRateLimitPolicyAnnotation] = val
-	}
-
-	return newAnnotations
-}
-
 func basicAuthPolicyMutator(existingObj, desiredObj client.Object) (bool, error) {
 	existing, ok := existingObj.(*istiosecurityv1beta1.AuthorizationPolicy)
 	if !ok {
@@ -340,39 +312,6 @@ func basicAuthPolicyMutator(existingObj, desiredObj client.Object) (bool, error)
 	desired, ok := desiredObj.(*istiosecurityv1beta1.AuthorizationPolicy)
 	if !ok {
 		return false, fmt.Errorf("%T is not a *istiosecurityv1beta1.AuthorizationPolicy", desiredObj)
-	}
-
-	updated := false
-	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
-		existing.Spec = desired.Spec
-		updated = true
-	}
-
-	tmpAnnotations := existing.GetAnnotations()
-	tmpUpdated := common.MergeMapStringString(&tmpAnnotations, desired.GetAnnotations())
-	if tmpUpdated {
-		existing.SetAnnotations(tmpAnnotations)
-		updated = true
-	}
-
-	tmpLabels := existing.GetLabels()
-	tmpUpdated = common.MergeMapStringString(&tmpLabels, desired.GetLabels())
-	if tmpUpdated {
-		existing.SetLabels(tmpLabels)
-		updated = true
-	}
-
-	return updated, nil
-}
-
-func basicRateLimitMutator(existingObj, desiredObj client.Object) (bool, error) {
-	existing, ok := existingObj.(*limitadorv1alpha1.RateLimit)
-	if !ok {
-		return false, fmt.Errorf("%T is not a *limitadorv1alpha1.RateLimit", existingObj)
-	}
-	desired, ok := desiredObj.(*limitadorv1alpha1.RateLimit)
-	if !ok {
-		return false, fmt.Errorf("%T is not a *limitadorv1alpha1.RateLimit", desiredObj)
 	}
 
 	updated := false
@@ -429,47 +368,6 @@ func basicEnvoyFilterMutator(existingObj, desiredObj client.Object) (bool, error
 	}
 
 	return updated, nil
-}
-
-func (r *RouteReconciler) desiredLimitadorRateLimts(ctx context.Context, route *routev1.Route) ([]*limitadorv1alpha1.RateLimit, error) {
-	annotations := route.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	rlpName, ok := annotations[mappers.KuadrantRateLimitPolicyAnnotation]
-
-	if !ok {
-		return nil, nil
-	}
-
-	rlpKey := client.ObjectKey{Name: rlpName, Namespace: route.Namespace}
-	rlp := &apimv1alpha1.RateLimitPolicy{}
-	if err := r.Client().Get(ctx, rlpKey, rlp); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	rateLimitList := make([]*limitadorv1alpha1.RateLimit, 0)
-	for idx, rlSpec := range rlp.Spec.Limits {
-		ratelimitfactory := common.RateLimitFactory{
-			Key: client.ObjectKey{
-				Name: desiredLimitadorRateLimitNameFromRLP(rlpKey, idx+1),
-				// Currently, Limitador Operator (v0.2.0) will configure limitador services with
-				// RateLimit CRs created in the same namespace.
-				Namespace: common.KuadrantNamespace,
-			},
-			Conditions: rlSpec.Conditions,
-			MaxValue:   rlSpec.MaxValue,
-			Namespace:  rlSpec.Namespace,
-			Variables:  rlSpec.Variables,
-			Seconds:    rlSpec.Seconds,
-		}
-		rateLimitList = append(rateLimitList, ratelimitfactory.RateLimit())
-	}
-
-	return rateLimitList, nil
 }
 
 func (r *RouteReconciler) desiredRateLimitFilterEnvoyFilter(route *routev1.Route) (*istionetworkingv1alpha3.EnvoyFilter, error) {
