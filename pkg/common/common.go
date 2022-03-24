@@ -64,6 +64,7 @@ func Contains(slice []string, target string) bool {
 }
 
 // MergeMapStringString Merge desired into existing.
+// Not Thread-Safe. Does it matter?
 func MergeMapStringString(existing *map[string]string, desired map[string]string) bool {
 	modified := false
 
