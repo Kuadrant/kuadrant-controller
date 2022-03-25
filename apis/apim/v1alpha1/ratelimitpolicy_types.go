@@ -17,11 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
-	istiov1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
+	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -107,7 +105,6 @@ type RateLimit struct {
 type Operation struct {
 	Paths   []string `json:"paths,omitempty"`
 	Methods []string `json:"methods,omitempty"`
-	Hosts   []string `json:"hosts,omitempty"`
 }
 
 type Rule struct {
@@ -132,61 +129,78 @@ type RateLimitPolicySpec struct {
 	Limits     []limitadorv1alpha1.RateLimitSpec `json:"limits,omitempty"`
 }
 
-type ObjectRefStatus struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-}
-
-type VirtualServicesStatus struct {
+type RoutingResourceStatusEntry struct {
 	Name string `json:"name"`
 
 	// +optional
-	Gateways []ObjectRefStatus `json:"gateways,omitempty"`
+	Gateways []string `json:"gateways,omitempty"`
 }
 
 // RateLimitPolicyStatus defines the observed state of RateLimitPolicy
 type RateLimitPolicyStatus struct {
 	// VirtualServices represents the current VirtualService objects with reference to this ratelimitpolicy object
 	// +optional
-	VirtualServices []VirtualServicesStatus `json:"virtualservices,omitempty"`
+	VirtualServices []RoutingResourceStatusEntry `json:"virtualservices,omitempty"`
+	HTTPRoutes      []RoutingResourceStatusEntry `json:"httproutes,omitempty"`
 }
 
-// AddVirtualService Adds virtualservice to the list of objects only if it does not exit. Returns true when added.
-func (r *RateLimitPolicyStatus) AddVirtualService(vs *istiov1alpha3.VirtualService) bool {
-	for idx := range r.VirtualServices {
-		if r.VirtualServices[idx].Name == vs.Name {
-			return false
+// AddEntry adds a new or update the existing entry in the status block.
+func (r *RateLimitPolicyStatus) AddEntry(networkKind, networkName string, gateways []string) {
+	if len(gateways) == 0 {
+		return // without gateways it's same as doing nothing
+	}
+
+	entry := RoutingResourceStatusEntry{
+		Name:     networkName,
+		Gateways: gateways,
+	}
+
+	if networkKind == common.VirtualServiceKind {
+		r.VirtualServices = append(r.VirtualServices, entry)
+	} else {
+		r.HTTPRoutes = append(r.HTTPRoutes, entry)
+	}
+}
+
+// DeleteEntry removes the existing entry in the status block.
+func (r *RateLimitPolicyStatus) DeleteEntry(networkKind, networkName string) {
+	if networkKind == common.VirtualServiceKind {
+		for idx := range r.VirtualServices {
+			if r.VirtualServices[idx].Name == networkName {
+				// remove the element at idx
+				r.VirtualServices = append(r.VirtualServices[:idx], r.VirtualServices[idx+1:]...)
+				break
+			}
+		}
+	} else {
+		for idx := range r.HTTPRoutes {
+			if r.HTTPRoutes[idx].Name == networkName {
+				r.HTTPRoutes = append(r.HTTPRoutes[:idx], r.HTTPRoutes[idx+1:]...)
+				break
+			}
+		}
+	}
+}
+
+func (r *RateLimitPolicyStatus) GetGateways(networkKind, networkName string) []string {
+	var results []string
+	if networkKind == common.VirtualServiceKind {
+		for idx := range r.VirtualServices {
+			if r.VirtualServices[idx].Name == networkName {
+				gws := r.VirtualServices[idx].Gateways
+				results = append(results, gws...)
+			}
+		}
+	} else {
+		for idx := range r.HTTPRoutes {
+			if r.HTTPRoutes[idx].Name == networkName {
+				gws := r.HTTPRoutes[idx].Gateways
+				results = append(results, gws...)
+			}
 		}
 	}
 
-	// Not found, add it
-
-	newVSStatus := VirtualServicesStatus{
-		Name: vs.Name,
-	}
-
-	for _, gw := range vs.Spec.Gateways {
-		gwKey := common.NamespacedNameToObjectKey(gw, vs.Namespace)
-		newVSStatus.Gateways = append(newVSStatus.Gateways, ObjectRefStatus{
-			Name:      gwKey.Name,
-			Namespace: gwKey.Namespace,
-		})
-	}
-
-	r.VirtualServices = append(r.VirtualServices, newVSStatus)
-	return true
-}
-
-// DeleteVirtualService removes virtualservice from the list of objects only if it does exit. Returns true when deleted from the list.
-func (r *RateLimitPolicyStatus) DeleteVirtualService(vs *istiov1alpha3.VirtualService) bool {
-	for idx := range r.VirtualServices {
-		if r.VirtualServices[idx].Name == vs.Name {
-			// remove the element at idx
-			r.VirtualServices = append(r.VirtualServices[:idx], r.VirtualServices[idx+1:]...)
-			return true
-		}
-	}
-	return false
+	return results
 }
 
 //+kubebuilder:object:root=true

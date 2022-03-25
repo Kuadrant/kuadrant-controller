@@ -32,6 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
@@ -50,6 +51,16 @@ const (
 type RateLimitPolicyReconciler struct {
 	*reconcilers.BaseReconciler
 	Scheme *runtime.Scheme
+}
+
+// SignalingNetwork contains the relevant information about the signaling routing resource.
+type SignalingNetwork struct {
+	// Routing resource sending the signal
+	NetworkName string
+	// Routing resource kind (VirtualService/HTTPRoute)
+	NetworkKind string
+	// Gateways attached to the routing resource
+	Gateways []string
 }
 
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=ratelimitpolicies,verbs=get;list;watch;create;update;patch;delete
@@ -117,53 +128,56 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	// Operation specific annotations must be removed if they were present
+	// Operation specific annotations must be removed if they are present.
 	updateRequired := false
-	// check for delete operation for virtualservice
-	if vsName, present := rlp.Annotations[KuadrantDeleteVSAnnotation]; present {
-		vsNamespacedName := client.ObjectKey{
-			Namespace: rlp.Namespace, // VirtualService lookup is limited to RLP's namespace
-			Name:      vsName,
-		}
-		vsKey := vsNamespacedName.String()
+	var delNetwork *SignalingNetwork
+	var addNetwork *SignalingNetwork
 
-		var vs istio.VirtualService
-		// TODO(eastizle): if VirtualService has been deleted,
-		// the Get operation returns NotFound and annotation is not deleted
-		if err := r.Client().Get(ctx, vsNamespacedName, &vs); err != nil {
-			if apierrors.IsNotFound(err) {
-				logger.Info("no VirtualService found", "lookup name", vsNamespacedName.String())
-				return ctrl.Result{}, nil
-			}
-			logger.Error(err, "failed to get VirtualService")
+	// check for delete operation from virtualservice
+	if signalingVSName, present := rlp.Annotations[KuadrantDeleteVSAnnotation]; present {
+		delNetwork = &SignalingNetwork{
+			NetworkName: signalingVSName,
+			NetworkKind: common.VirtualServiceKind,
+			Gateways:    rlp.Status.GetGateways(common.VirtualServiceKind, signalingVSName),
+		}
+	}
+
+	// check for delete operation for httproute
+	if signalingHRName, present := rlp.Annotations[KuadrantDeleteHRAnnotation]; present {
+		delNetwork = &SignalingNetwork{
+			NetworkName: signalingHRName,
+			NetworkKind: common.HTTPRouteKind,
+			Gateways:    rlp.Status.GetGateways(common.HTTPRouteKind, signalingHRName),
+		}
+	}
+
+	if delNetwork != nil {
+		networkObjKey := client.ObjectKey{Namespace: rlp.Namespace, Name: delNetwork.NetworkName}
+		if err := r.detachFromNetwork(ctx, delNetwork.Gateways, networkObjKey.String(), &rlp); err != nil {
+			logger.Error(err, "failed to detach RateLimitPolicy from routing resource")
 			return ctrl.Result{}, err
 		}
 
-		if err := r.detachFromNetwork(ctx, vs.Spec.Gateways, vsKey, &rlp); err != nil {
-			logger.Error(err, "failed to detach RateLimitPolicy from VirtualService")
-			return ctrl.Result{}, err
-		}
-
-		if err := r.detachVSFromStatus(ctx, &vs, &rlp); err != nil {
+		if err := r.detachNetworkFromStatus(ctx, delNetwork, &rlp); err != nil {
 			return ctrl.Result{}, err
 		}
 
 		delete(rlp.Annotations, KuadrantDeleteVSAnnotation)
+		delete(rlp.Annotations, KuadrantDeleteHRAnnotation)
 		updateRequired = true
 	}
 
 	// check for add operation for virtualservice
 	if vsName, present := rlp.Annotations[KuadrantAddVSAnnotation]; present {
-		vsNamespacedName := client.ObjectKey{
+		vsKey := client.ObjectKey{
 			Namespace: rlp.Namespace,
 			Name:      vsName,
 		}
-		vsKey := vsNamespacedName.String()
 
 		var vs istio.VirtualService
-		if err := r.Client().Get(ctx, vsNamespacedName, &vs); err != nil {
+		if err := r.Client().Get(ctx, vsKey, &vs); err != nil {
 			if apierrors.IsNotFound(err) {
-				logger.Info("no VirtualService found", "lookup name", vsNamespacedName.String())
+				logger.Info("no VirtualService found", "virtualservice", vsKey.String())
 				return ctrl.Result{}, nil
 			}
 			logger.Error(err, "failed to get VirutalService")
@@ -172,16 +186,55 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 
 		fetchOperationsFromVS(&vs.Spec, &rlp.Spec)
 
-		if err := r.attachToNetwork(ctx, vs.Spec.Gateways, vsKey, &rlp); err != nil {
-			logger.Error(err, "failed to attach RateLimitPolicy to VirtualService")
+		addNetwork = &SignalingNetwork{
+			Gateways:    vs.Spec.Gateways,
+			NetworkName: vsName,
+			NetworkKind: common.VirtualServiceKind,
+		}
+	}
+
+	// check for add operation for httproute
+	if hrName, present := rlp.Annotations[KuadrantAddHRAnnotation]; present {
+		hrKey := client.ObjectKey{
+			Namespace: rlp.Namespace,
+			Name:      hrName,
+		}
+
+		var hr gatewayapiv1alpha2.HTTPRoute
+		if err := r.Client().Get(ctx, hrKey, &hr); err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Info("no HTTPRoute found", "httproute", hrKey.String())
+				return ctrl.Result{}, nil
+			}
+			logger.Error(err, "failed to get HTTPRoute")
 			return ctrl.Result{}, err
 		}
 
-		if err := r.attachVSToStatus(ctx, &vs, &rlp); err != nil {
+		// For Kuadrant, gateway obj will always be present in the system namespace
+		var gws []string
+		for _, parentRef := range hr.Spec.CommonRouteSpec.ParentRefs { //fix
+			gws = append(gws, fmt.Sprintf("%s/%s", common.KuadrantNamespace, parentRef.Name))
+		}
+		addNetwork = &SignalingNetwork{
+			Gateways:    gws,
+			NetworkName: hrName,
+			NetworkKind: common.HTTPRouteKind,
+		}
+	}
+
+	if addNetwork != nil {
+		networkObjKey := client.ObjectKey{Namespace: rlp.Namespace, Name: addNetwork.NetworkName}
+		if err := r.attachToNetwork(ctx, addNetwork.Gateways, networkObjKey.String(), &rlp); err != nil {
+			logger.Error(err, "failed to attach RateLimitPolicy to routing resource")
+			return ctrl.Result{}, err
+		}
+
+		if err := r.attachNetworkToStatus(ctx, addNetwork, &rlp); err != nil {
 			return ctrl.Result{}, err
 		}
 
 		delete(rlp.Annotations, KuadrantAddVSAnnotation)
+		delete(rlp.Annotations, KuadrantAddHRAnnotation)
 		updateRequired = true
 	}
 
@@ -495,9 +548,7 @@ func fetchOperationsFromVS(vs *networkingv1alpha3.VirtualService, rlp *apimv1alp
 					reqMatched, _ := regexp.MatchString(rule.Name, httpMatchReq.Name)
 
 					if routeMatched || reqMatched {
-						operation := apimv1alpha1.Operation{
-							Hosts: vs.Hosts,
-						}
+						operation := apimv1alpha1.Operation{}
 
 						if normalizedURI := normalizeStringMatch(httpMatchReq.Uri); normalizedURI != "" {
 							operation.Paths = append(operation.Paths, normalizedURI)
@@ -515,24 +566,26 @@ func fetchOperationsFromVS(vs *networkingv1alpha3.VirtualService, rlp *apimv1alp
 	}
 }
 
-func (r *RateLimitPolicyReconciler) attachVSToStatus(ctx context.Context, vs *istio.VirtualService, rlp *apimv1alpha1.RateLimitPolicy) error {
-	if updated := rlp.Status.AddVirtualService(vs); updated {
-		logger := logr.FromContext(ctx)
-		err := r.Client().Status().Update(ctx, rlp)
-		logger.V(1).Info("adding VS to status", "virtualservice", vs.Name, "error", err)
-		return err
-	}
-	return nil
+func (r *RateLimitPolicyReconciler) attachNetworkToStatus(ctx context.Context, network *SignalingNetwork, rlp *apimv1alpha1.RateLimitPolicy) error {
+	logger := logr.FromContext(ctx)
+	networkKind := network.NetworkKind
+	networkName := network.NetworkName
+
+	logger.V(1).Info("attaching network to status", "network kind", networkKind, "network name", networkName)
+	rlp.Status.AddEntry(networkKind, networkName, network.Gateways)
+
+	return r.Client().Status().Update(ctx, rlp)
 }
 
-func (r *RateLimitPolicyReconciler) detachVSFromStatus(ctx context.Context, vs *istio.VirtualService, rlp *apimv1alpha1.RateLimitPolicy) error {
-	if updated := rlp.Status.DeleteVirtualService(vs); updated {
-		logger := logr.FromContext(ctx)
-		err := r.Client().Status().Update(ctx, rlp)
-		logger.V(1).Info("deleting VS from status", "virtualservice", vs.Name, "error", err)
-		return err
-	}
-	return nil
+func (r *RateLimitPolicyReconciler) detachNetworkFromStatus(ctx context.Context, network *SignalingNetwork, rlp *apimv1alpha1.RateLimitPolicy) error {
+	logger := logr.FromContext(ctx)
+	networkKind := network.NetworkKind
+	networkName := network.NetworkName
+
+	logger.V(1).Info("detaching network from status", "network kind", networkKind, "network name", networkName)
+	rlp.Status.DeleteEntry(networkKind, networkName)
+
+	return r.Client().Status().Update(ctx, rlp)
 }
 
 // SetupWithManager sets up the controller with the Manager.
