@@ -237,7 +237,7 @@ kind: ## Download kind locally if necessary.
 
 # istioctl tool
 ISTIOCTL=$(PROJECT_PATH)/bin/istioctl
-ISTIOVERSION = 1.12.1
+ISTIOVERSION = 1.12.2
 $(ISTIOCTL):
 	mkdir -p $(PROJECT_PATH)/bin
 	$(eval TMP := $(shell mktemp -d))

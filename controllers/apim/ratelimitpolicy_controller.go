@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 
 	"github.com/go-logr/logr"
 	"github.com/gogo/protobuf/types"
@@ -61,6 +60,8 @@ type SignalingNetwork struct {
 	NetworkKind string
 	// Gateways attached to the routing resource
 	Gateways []string
+	// Virtual hosts configured by the routing resource
+	Hosts []string
 }
 
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=ratelimitpolicies,verbs=get;list;watch;create;update;patch;delete
@@ -70,15 +71,6 @@ type SignalingNetwork struct {
 //+kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;delete;update;patch
 //+kubebuilder:rbac:groups=limitador.kuadrant.io,resources=ratelimits,verbs=get;list;watch;create;update;delete;patch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the RateLimitPolicy object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Logger().WithValues("RateLimitPolicy", req.NamespacedName)
 	logger.Info("Reconciling RateLimitPolicy")
@@ -184,11 +176,10 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 			return ctrl.Result{}, err
 		}
 
-		fetchOperationsFromVS(&vs.Spec, &rlp.Spec)
-
 		addNetwork = &SignalingNetwork{
 			Gateways:    vs.Spec.Gateways,
 			NetworkName: vsName,
+			Hosts:       vs.Spec.Hosts,
 			NetworkKind: common.VirtualServiceKind,
 		}
 	}
@@ -218,13 +209,14 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 		addNetwork = &SignalingNetwork{
 			Gateways:    gws,
 			NetworkName: hrName,
+			Hosts:       HostnamesToStrings(hr.Spec.Hostnames),
 			NetworkKind: common.HTTPRouteKind,
 		}
 	}
 
 	if addNetwork != nil {
 		networkObjKey := client.ObjectKey{Namespace: rlp.Namespace, Name: addNetwork.NetworkName}
-		if err := r.attachToNetwork(ctx, addNetwork.Gateways, networkObjKey.String(), &rlp); err != nil {
+		if err := r.attachToNetwork(ctx, addNetwork, networkObjKey.String(), &rlp); err != nil {
 			logger.Error(err, "failed to attach RateLimitPolicy to routing resource")
 			return ctrl.Result{}, err
 		}
@@ -281,11 +273,11 @@ func (r *RateLimitPolicyReconciler) detachFromNetwork(ctx context.Context, gatew
 	return nil
 }
 
-func (r *RateLimitPolicyReconciler) attachToNetwork(ctx context.Context, gateways []string, owner string, rlp *apimv1alpha1.RateLimitPolicy) error {
+func (r *RateLimitPolicyReconciler) attachToNetwork(ctx context.Context, network *SignalingNetwork, owner string, rlp *apimv1alpha1.RateLimitPolicy) error {
 	logger := logr.FromContext(ctx)
 	logger.Info("Attaching RateLimitPolicy to a network")
 
-	for _, gw := range gateways {
+	for _, gw := range network.Gateways {
 		gwKey := common.NamespacedNameToObjectKey(gw, rlp.Namespace)
 		gwLabels := gatewayLabels(ctx, r.Client(), gwKey)
 
@@ -300,7 +292,7 @@ func (r *RateLimitPolicyReconciler) attachToNetwork(ctx context.Context, gateway
 			}
 		}
 
-		if err := updateEnvoyFilter(ctx, wasmEnvoyFilter, rlp, gwKey, gwLabels); err != nil {
+		if err := updateEnvoyFilter(ctx, wasmEnvoyFilter, rlp, gwKey, gwLabels, network.Hosts); err != nil {
 			logger.Error(err, "failed to create/update EnvoyFilter containing wasm filters")
 			return err
 		}
@@ -321,13 +313,13 @@ func (r *RateLimitPolicyReconciler) attachToNetwork(ctx context.Context, gateway
 // - Post-Authorization ratelimit wasm filter
 // - Limitador cluster (tmp-fix)
 // - Wasm cluster
-func updateEnvoyFilter(ctx context.Context, existingObj *istio.EnvoyFilter, rlp *apimv1alpha1.RateLimitPolicy, gwKey client.ObjectKey, gwLabels map[string]string) error {
+func updateEnvoyFilter(ctx context.Context, existingObj *istio.EnvoyFilter, rlp *apimv1alpha1.RateLimitPolicy, gwKey client.ObjectKey, gwLabels map[string]string, hosts []string) error {
 	logger := logr.FromContext(ctx)
 
 	rlpKey := client.ObjectKeyFromObject(rlp)
 
-	preAuthPluginPolicy := kuadrantistioutils.PluginPolicyFromRateLimitPolicy(rlp, apimv1alpha1.RateLimitStagePREAUTH)
-	postAuthPluginPolicy := kuadrantistioutils.PluginPolicyFromRateLimitPolicy(rlp, apimv1alpha1.RateLimitStagePOSTAUTH)
+	preAuthPluginPolicy := kuadrantistioutils.PluginPolicyFromRateLimitPolicy(rlp, hosts, apimv1alpha1.RateLimitStagePREAUTH)
+	postAuthPluginPolicy := kuadrantistioutils.PluginPolicyFromRateLimitPolicy(rlp, hosts, apimv1alpha1.RateLimitStagePOSTAUTH)
 
 	finalPatches := []*networkingv1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{}
 
@@ -380,7 +372,7 @@ func updateEnvoyFilter(ctx context.Context, existingObj *istio.EnvoyFilter, rlp 
 											"cluster": kuadrantistioutils.PatchedWasmClusterName,
 											"timeout": "10s",
 										},
-										"sha256": "335a05fbb0fcd4e68856c9c48aac2d8f4d07d7cf3f2f49a8be35c69b384daf9d",
+										"sha256": "2b181bb55b6dc9cfae8cf5feaf9ec090145e737b141faaf9ea49efa607d07c23",
 										"retry_policy": map[string]interface{}{
 											"num_retries": 10,
 										},
@@ -535,35 +527,6 @@ func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *ap
 	}
 	logger.Info("successfully created/updated RateLimit resources")
 	return nil
-}
-
-// fetchOperationsFromVS captures match rules from VirtualService and fill into RateLimitPolicy
-func fetchOperationsFromVS(vs *networkingv1alpha3.VirtualService, rlp *apimv1alpha1.RateLimitPolicySpec) {
-	for _, rule := range rlp.Rules {
-		if len(rule.Name) > 0 {
-			for _, httpRoute := range vs.Http {
-				routeMatched, _ := regexp.MatchString(rule.Name, httpRoute.Name)
-
-				for _, httpMatchReq := range httpRoute.Match {
-					reqMatched, _ := regexp.MatchString(rule.Name, httpMatchReq.Name)
-
-					if routeMatched || reqMatched {
-						operation := apimv1alpha1.Operation{}
-
-						if normalizedURI := normalizeStringMatch(httpMatchReq.Uri); normalizedURI != "" {
-							operation.Paths = append(operation.Paths, normalizedURI)
-						}
-
-						if normalizedMethod := normalizeStringMatch(httpMatchReq.Method); normalizedMethod != "" {
-							operation.Methods = append(operation.Methods, normalizedMethod)
-						}
-
-						rule.Operations = append(rule.Operations, &operation)
-					}
-				}
-			}
-		}
-	}
 }
 
 func (r *RateLimitPolicyReconciler) attachNetworkToStatus(ctx context.Context, network *SignalingNetwork, rlp *apimv1alpha1.RateLimitPolicy) error {

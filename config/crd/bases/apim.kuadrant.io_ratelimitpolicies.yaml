@@ -149,12 +149,6 @@ spec:
               rules:
                 items:
                   properties:
-                    name:
-                      description: Name supports regex for fetching operations from
-                        routing resources For VirtualService, if route name matches,
-                        all the match requests are converted to operations internally.
-                        But specific match request names are also supported.
-                      type: string
                     operations:
                       description: Operation specifies the operations of a request
                       items:

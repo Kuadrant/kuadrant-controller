@@ -108,11 +108,6 @@ type Operation struct {
 }
 
 type Rule struct {
-	// Name supports regex for fetching operations from routing resources
-	// For VirtualService, if route name matches, all the match requests are
-	// converted to operations internally. But specific match request names
-	// are also supported.
-	Name string `json:"name,omitempty"`
 	// Operation specifies the operations of a request
 	// +optional
 	Operations []*Operation `json:"operations,omitempty"`

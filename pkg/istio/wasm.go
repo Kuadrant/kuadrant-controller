@@ -11,6 +11,7 @@ type Rule struct {
 }
 
 type PluginPolicy struct {
+	Hosts           []string                        `json:"hosts,omitempty"`
 	Rules           []*Rule                         `json:"rules"`
 	GlobalActions   []*apimv1alpha1.ActionSpecifier `json:"global_actions,omitempty"`
 	UpstreamCluster string                          `json:"upstream_cluster"`
@@ -22,8 +23,10 @@ type PluginConfig struct {
 	PluginPolicies  map[string]PluginPolicy `json:"ratelimitpolicies"`
 }
 
-func PluginPolicyFromRateLimitPolicy(rlp *apimv1alpha1.RateLimitPolicy, pluginStage apimv1alpha1.RateLimitStage) *PluginPolicy {
-	pluginPolicy := &PluginPolicy{}
+func PluginPolicyFromRateLimitPolicy(rlp *apimv1alpha1.RateLimitPolicy, hosts []string, pluginStage apimv1alpha1.RateLimitStage) *PluginPolicy {
+	pluginPolicy := &PluginPolicy{
+		Hosts: hosts,
+	}
 
 	// Filter through global ratelimits
 	for _, ratelimit := range rlp.Spec.RateLimits {
