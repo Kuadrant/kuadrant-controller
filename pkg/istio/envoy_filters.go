@@ -7,6 +7,7 @@ import (
 	istionetworkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
 )
 
@@ -151,4 +152,34 @@ func WasmClusterEnvoyPatch() *istioapiv1alpha3.EnvoyFilter_EnvoyConfigObjectPatc
 		},
 		Patch: patch,
 	}
+}
+
+// EnvoyFilterRatelimitsUnstructured returns "rate_limits" envoy filter patch format from kuadrant rate limits
+func EnvoyFilterRatelimitsUnstructured(rateLimits []*apimv1alpha1.RateLimit) []map[string]interface{} {
+	envoyRateLimits := make([]map[string]interface{}, 0)
+	for _, rateLimit := range rateLimits {
+		if rateLimit.Stage == apimv1alpha1.RateLimitStageBOTH {
+			// Apply same actions to both stages
+			stages := []apimv1alpha1.RateLimitStage{
+				apimv1alpha1.RateLimitStagePREAUTH,
+				apimv1alpha1.RateLimitStagePOSTAUTH,
+			}
+
+			for _, stage := range stages {
+				envoyRateLimit := map[string]interface{}{
+					"stage":   apimv1alpha1.RateLimitStageValue[stage],
+					"actions": rateLimit.Actions,
+				}
+				envoyRateLimits = append(envoyRateLimits, envoyRateLimit)
+			}
+		} else {
+			envoyRateLimit := map[string]interface{}{
+				"stage":   apimv1alpha1.RateLimitStageValue[rateLimit.Stage],
+				"actions": rateLimit.Actions,
+			}
+			envoyRateLimits = append(envoyRateLimits, envoyRateLimit)
+		}
+	}
+
+	return envoyRateLimits
 }
