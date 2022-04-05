@@ -20,6 +20,7 @@ import (
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -122,11 +123,15 @@ type Rule struct {
 
 // RateLimitPolicySpec defines the desired state of RateLimitPolicy
 type RateLimitPolicySpec struct {
+	// TargetRef identifies an API object to apply policy to.
+	TargetRef gatewayapiv1alpha2.PolicyTargetReference `json:"targetRef"`
+	// +optional
 	Rules []*Rule `json:"rules,omitempty"`
 	// +optional
-	RateLimits []*RateLimit                      `json:"rateLimits,omitempty"`
-	Domain     string                            `json:"domain"`
-	Limits     []limitadorv1alpha1.RateLimitSpec `json:"limits,omitempty"`
+	RateLimits []*RateLimit `json:"rateLimits,omitempty"`
+	Domain     string       `json:"domain"`
+	// +optional
+	Limits []limitadorv1alpha1.RateLimitSpec `json:"limits,omitempty"`
 }
 
 type RoutingResourceStatusEntry struct {
