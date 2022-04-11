@@ -55,7 +55,7 @@ func (r *HTTPRouteReconciler) Reconcile(eventCtx context.Context, req ctrl.Reque
 			gwName := string(parentRef.Name)
 			authObjKey := types.NamespacedName{
 				// Prefix is added to differentiate between routing objects
-				Name:      getAuthPolicyName(gwName, HTTPRouteNamePrefix, httproute.Name),
+				Name:      getAuthPolicyName(gwName, httproute.Name),
 				Namespace: gwNamespace,
 			}
 
@@ -171,7 +171,7 @@ func (r *HTTPRouteReconciler) reconcileAuthPolicy(ctx context.Context, logger lo
 
 		authPolicy := istiosecurityv1beta1.AuthorizationPolicy{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      getAuthPolicyName(gwName, HTTPRouteNamePrefix, hr.Name),
+				Name:      getAuthPolicyName(gwName, hr.Name),
 				Namespace: gwNamespace,
 			},
 			Spec: authPolicySpec,

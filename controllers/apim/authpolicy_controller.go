@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -25,7 +26,10 @@ type AuthPolicyReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+const authPolicyFinalizer = "authpolicy.kuadrant.io/finalizer"
+
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=authpolicies,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apim.kuadrant.io,resources=authpolicies/finalizers,verbs=update
 //+kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AuthPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -43,11 +47,38 @@ func (r *AuthPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	if ap.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&ap, authPolicyFinalizer) {
+		logger.V(1).Info("Handling removal of authpolicy object")
+		if err := r.removeIstioAuthPolicy(ctx, &ap); err != nil {
+			logger.Error(err, "failed to remove Istio's AuthorizationPolicy")
+			return ctrl.Result{}, err
+		}
+		controllerutil.RemoveFinalizer(&ap, authPolicyFinalizer)
+		if err := r.UpdateResource(ctx, &ap); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Ignore deleted resources, this can happen when foregroundDeletion is enabled
+	// https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/#foreground-cascading-deletion
+	if ap.GetDeletionTimestamp() != nil {
+		return ctrl.Result{}, nil
+	}
+
+	if !controllerutil.ContainsFinalizer(&ap, authPolicyFinalizer) {
+		controllerutil.AddFinalizer(&ap, authPolicyFinalizer)
+		if err := r.UpdateResource(ctx, &ap); client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+	}
+
 	if err := r.reconcileAuthPolicy(ctx, &ap); err != nil {
 		logger.Error(err, "failed to reconcile AuthPolicy")
 		return ctrl.Result{}, err
 	}
 
+	logger.Info("completed reconciling AuthPolicy")
 	return ctrl.Result{}, nil
 }
 
@@ -58,7 +89,7 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 	httpRoute, err := r.fetchHTTPRoute(ctx, ap)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("targetRef HTTPRoute not found")
+			logger.Info("referenced HTTPRoute not found")
 			return nil
 		}
 		return err
@@ -81,7 +112,7 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 
 		authPolicy := secv1beta1resources.AuthorizationPolicy{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      getAuthPolicyName(gwName, HTTPRouteNamePrefix, httpRoute.Name),
+				Name:      getAuthPolicyName(gwName, httpRoute.Name),
 				Namespace: gwNamespace,
 			},
 			Spec: secv1beta1types.AuthorizationPolicy{
@@ -106,10 +137,50 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 	return nil
 }
 
+func (r *AuthPolicyReconciler) removeIstioAuthPolicy(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
+	logger := logr.FromContext(ctx)
+	logger.Info("Removing Istio's AuthorizationPolicy")
+
+	httpRoute, err := r.fetchHTTPRoute(ctx, ap)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("referenced HTTPRoute not found")
+			return nil
+		}
+		return err
+	}
+
+	for _, parentRef := range httpRoute.Spec.ParentRefs {
+		gwNamespace := httpRoute.Namespace
+		if parentRef.Namespace != nil {
+			gwNamespace = string(*parentRef.Namespace)
+		}
+		gwName := string(parentRef.Name)
+
+		authPolicyKey := client.ObjectKey{
+			Namespace: gwNamespace,
+			Name:      getAuthPolicyName(gwName, httpRoute.Name),
+		}
+
+		istioAuthPolicy := &secv1beta1resources.AuthorizationPolicy{}
+		if err := r.GetResource(ctx, authPolicyKey, istioAuthPolicy); err != nil {
+			logger.Error(err, "failed to fetch Istio's AuthorizationPolicy")
+			return err
+		}
+
+		if err := r.DeleteResource(ctx, istioAuthPolicy); err != nil {
+			logger.Error(err, "failed to delete Istio's AuthorizationPolicy")
+			return err
+		}
+	}
+
+	logger.Info("removed Istio's AuthorizationPolicy")
+	return nil
+}
+
 // fetchHTTPRoute fetches the HTTPRoute described in targetRef *within* AuthPolicy's namespace.
 func (r *AuthPolicyReconciler) fetchHTTPRoute(ctx context.Context, ap *apimv1alpha1.AuthPolicy) (*gatewayapiv1alpha2.HTTPRoute, error) {
 	logger := logr.FromContext(ctx)
-
 	key := client.ObjectKey{
 		Name:      string(ap.Spec.TargetRef.Name),
 		Namespace: ap.Namespace,
