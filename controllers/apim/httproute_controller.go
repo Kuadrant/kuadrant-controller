@@ -43,16 +43,6 @@ func (r *HTTPRouteReconciler) Reconcile(eventCtx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	// check if we have to send any signal to the RateLimitPolicy
-	_, toAttach := httproute.GetAnnotations()[KuadrantAttachNetwork]
-	_, toDetach := httproute.GetAnnotations()[KuadrantDetachNetwork]
-	if toAttach || toDetach {
-		if err := SendSignal(ctx, r.Client(), &httproute); err != nil {
-			logger.Error(err, "failed to send signal to RateLimitPolicy")
-			return ctrl.Result{}, err
-		}
-	}
-
 	// TODO(rahulanand16nov): handle HTTPRoute deletion for AuthPolicy
 	// check if this httproute has to be protected or not.
 	_, present := httproute.GetAnnotations()[common.KuadrantAuthProviderAnnotation]
@@ -206,6 +196,7 @@ func (r *HTTPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// converts []gatewayapi_v1alpha2.Hostname to []string
 func HostnamesToStrings(hostnames []gatewayapi_v1alpha2.Hostname) []string {
 	hosts := []string{}
 	for idx := range hostnames {
