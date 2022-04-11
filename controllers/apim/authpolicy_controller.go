@@ -25,8 +25,8 @@ type AuthPolicyReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=authpolicies,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AuthPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Logger().WithValues("AuthPolicy", req.NamespacedName)
@@ -77,13 +77,15 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 			rulePtrSlice = append(rulePtrSlice, &ap.Spec.Rules[idx])
 		}
 
+		action_int := secv1beta1types.AuthorizationPolicy_Action_value[string(ap.Spec.Action)]
+
 		authPolicy := secv1beta1resources.AuthorizationPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      getAuthPolicyName(gwName, HTTPRouteNamePrefix, httpRoute.Name),
 				Namespace: gwNamespace,
 			},
 			Spec: secv1beta1types.AuthorizationPolicy{
-				Action: ap.Spec.AuthorizationPolicy_Action,
+				Action: secv1beta1types.AuthorizationPolicy_Action(action_int),
 				Rules:  rulePtrSlice,
 				ActionDetail: &secv1beta1types.AuthorizationPolicy_Provider{
 					Provider: &ap.Spec.Provider,

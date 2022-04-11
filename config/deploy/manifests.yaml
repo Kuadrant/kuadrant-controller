@@ -40,8 +40,12 @@ spec:
             properties:
               action:
                 description: The action to take if the request is matches with the rules.
-                format: int32
-                type: integer
+                enum:
+                - ALLOW
+                - CUSTOM
+                - DENY
+                - AUDIT
+                type: string
               provider:
                 description: Specifies detailed configuration of the CUSTOM action. Must be used only with CUSTOM action.
                 properties:

@@ -7,12 +7,15 @@ import (
 	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
+// +kubebuilder:validation:Enum=ALLOW;CUSTOM;DENY;AUDIT
+type AuthPolicy_Action string
+
 type AuthPolicySpec struct {
 	// TargetRef identifies an API object to apply policy to.
 	TargetRef gatewayapiv1alpha2.PolicyTargetReference `json:"targetRef"`
 
 	// The action to take if the request is matches with the rules.
-	securityv1beta1.AuthorizationPolicy_Action `json:"action,omitempty"`
+	Action AuthPolicy_Action `json:"action,omitempty"`
 
 	// A list of rules to match the request. A match occurs when at least one rule matches the request.
 	Rules []securityv1beta1.Rule `json:"rules,omitempty"`
