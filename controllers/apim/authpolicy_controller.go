@@ -77,7 +77,7 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 			rulePtrSlice = append(rulePtrSlice, &ap.Spec.Rules[idx])
 		}
 
-		action_int := secv1beta1types.AuthorizationPolicy_Action_value[string(ap.Spec.Action)]
+		actionInt := secv1beta1types.AuthorizationPolicy_Action_value[string(ap.Spec.Action)]
 
 		authPolicy := secv1beta1resources.AuthorizationPolicy{
 			ObjectMeta: metav1.ObjectMeta{
@@ -85,7 +85,7 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 				Namespace: gwNamespace,
 			},
 			Spec: secv1beta1types.AuthorizationPolicy{
-				Action: secv1beta1types.AuthorizationPolicy_Action(action_int),
+				Action: secv1beta1types.AuthorizationPolicy_Action(actionInt),
 				Rules:  rulePtrSlice,
 				ActionDetail: &secv1beta1types.AuthorizationPolicy_Provider{
 					Provider: &ap.Spec.Provider,

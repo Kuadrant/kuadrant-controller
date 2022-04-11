@@ -8,14 +8,14 @@ import (
 )
 
 // +kubebuilder:validation:Enum=ALLOW;CUSTOM;DENY;AUDIT
-type AuthPolicy_Action string
+type AuthPolicyAction string
 
 type AuthPolicySpec struct {
 	// TargetRef identifies an API object to apply policy to.
 	TargetRef gatewayapiv1alpha2.PolicyTargetReference `json:"targetRef"`
 
 	// The action to take if the request is matches with the rules.
-	Action AuthPolicy_Action `json:"action,omitempty"`
+	Action AuthPolicyAction `json:"action,omitempty"`
 
 	// A list of rules to match the request. A match occurs when at least one rule matches the request.
 	Rules []securityv1beta1.Rule `json:"rules,omitempty"`
