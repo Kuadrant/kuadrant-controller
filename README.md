@@ -137,14 +137,6 @@ spec:
             - generic_key:
                 descriptor_key: admin
                 descriptor_value: "yes"
-            - metadata:
-                descriptor_key: "user-id"
-                default_value: "no-user"
-                metadata_key:
-                  key: "envoy.filters.http.ext_authz"
-                  path:
-                    - key: "ext_auth_data"
-                    - key: "user-id"
   rateLimits:
     - stage: BOTH
       actions:
@@ -160,15 +152,7 @@ spec:
       variables: []
     - conditions:
       - "admin == yes"
-      - "user-id == bob"
       max_value: 2
-      namespace: toystore-app
-      seconds: 30
-      variables: []
-    - conditions:
-      - "addmin == yes"
-      - "user-id == alice"
-      max_value: 4
       namespace: toystore-app
       seconds: 30
       variables: []
@@ -196,7 +180,6 @@ NAMESPACE         NAME                     AGE
 kuadrant-system   rlp-default-toystore-1   49s
 kuadrant-system   rlp-default-toystore-2   49s
 kuadrant-system   rlp-default-toystore-3   49s
-kuadrant-system   rlp-default-toystore-4   49s
 ```
 
 6.- Verify unauthenticated rate limit
@@ -231,16 +214,6 @@ spec:
         in: authorization_header
         keySelector: APIKEY
       name: apikey
-  response:
-    - json:
-        properties:
-          - name: user-id
-            value: null
-            valueFrom:
-              authJSON: auth.identity.metadata.annotations.secret\.kuadrant\.io/user-id
-      name: rate-limit-apikey
-      wrapper: envoyDynamicMetadata
-      wrapperKey: ext_auth_data
 EOF
 ```
 
@@ -282,20 +255,6 @@ Should return `200 OK`
 
 ```
 curl -v -H 'Host: api.toystore.com' -H 'Authorization: APIKEY ALICEKEYFORDEMO' -X POST http://localhost:9080/admin/toy
-```
-
-10.- Verify authenticated rate limit per user
-
-4 times and should be rate limited
-
-```
-curl -v -H 'Host: api.toystore.com' -H 'Authorization: APIKEY ALICEKEYFORDEMO' -X POST http://localhost:9080/admin/toy
-```
-
-2 times and should be rate limited
-
-```
-curl -v -H 'Host: api.toystore.com' -H 'Authorization: APIKEY BOBKEYFORDEMO' -X POST http://localhost:9080/admin/toy
 ```
 
 ## Contributing
