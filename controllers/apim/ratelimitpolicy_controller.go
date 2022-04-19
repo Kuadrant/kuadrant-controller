@@ -134,7 +134,12 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 }
 
 func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) (ctrl.Result, error) {
-	err := r.reconcileNetworkResourceBackReference(ctx, rlp)
+	err := rlp.Validate()
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	err = r.reconcileNetworkResourceBackReference(ctx, rlp)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

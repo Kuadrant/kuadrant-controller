@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
@@ -181,6 +183,22 @@ type RateLimitPolicy struct {
 
 	Spec   RateLimitPolicySpec   `json:"spec,omitempty"`
 	Status RateLimitPolicyStatus `json:"status,omitempty"`
+}
+
+func (r *RateLimitPolicy) Validate() error {
+	if r.Spec.TargetRef.Group != gatewayapiv1alpha2.Group("gateway.networking.k8s.io") {
+		return fmt.Errorf("invalid targetRef.Group %s. The only supported group is gateway.networking.k8s.io", r.Spec.TargetRef.Group)
+	}
+
+	if r.Spec.TargetRef.Kind != gatewayapiv1alpha2.Kind("HTTPRoute") {
+		return fmt.Errorf("invalid targetRef.Kind %s. The only supported kind is HTTPRoute", r.Spec.TargetRef.Kind)
+	}
+
+	if r.Spec.TargetRef.Namespace != nil && string(*r.Spec.TargetRef.Namespace) != r.Namespace {
+		return fmt.Errorf("invalid targetRef.Namespace %s. Currently only supporting references to the same namespace", *r.Spec.TargetRef.Namespace)
+	}
+
+	return nil
 }
 
 //+kubebuilder:object:root=true
