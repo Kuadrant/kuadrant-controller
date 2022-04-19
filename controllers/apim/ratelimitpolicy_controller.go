@@ -108,6 +108,32 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 		}
 	}
 
+	specResult, specErr := r.reconcileSpec(ctx, rlp)
+	if specErr == nil && specResult.Requeue {
+		logger.V(1).Info("Reconciling spec not finished. Requeueing.")
+		return specResult, nil
+	}
+
+	statusResult, statusErr := r.reconcileStatus(ctx, rlp, specErr)
+
+	if specErr != nil {
+		return ctrl.Result{}, specErr
+	}
+
+	if statusErr != nil {
+		return ctrl.Result{}, statusErr
+	}
+
+	if statusResult.Requeue {
+		logger.V(1).Info("Reconciling status not finished. Requeueing.")
+		return statusResult, nil
+	}
+
+	logger.Info("successfully reconciled RateLimitPolicy")
+	return ctrl.Result{}, nil
+}
+
+func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) (ctrl.Result, error) {
 	err := r.reconcileNetworkResourceBackReference(ctx, rlp)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -121,7 +147,6 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	logger.Info("successfully reconciled RateLimitPolicy")
 	return ctrl.Result{}, nil
 }
 
