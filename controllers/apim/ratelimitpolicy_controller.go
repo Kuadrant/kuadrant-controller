@@ -18,6 +18,7 @@ package apim
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	"github.com/kuadrant/limitador-operator/api/v1alpha1"
@@ -200,8 +201,13 @@ func (r *RateLimitPolicyReconciler) reconcileNetworkResourceBackReference(ctx co
 		httpRouteAnnotations = map[string]string{}
 	}
 
-	if _, ok := httpRouteAnnotations[common.RateLimitPolicyBackRefAnnotation]; !ok {
-		rlpKey := client.ObjectKeyFromObject(rlp)
+	rlpKey := client.ObjectKeyFromObject(rlp)
+	val, ok := httpRouteAnnotations[common.RateLimitPolicyBackRefAnnotation]
+	if ok {
+		if val != rlpKey.String() {
+			return fmt.Errorf("the target HTTPRoute {%s} is already referenced by ratelimitpolicy %s", client.ObjectKeyFromObject(httpRoute), rlpKey.String())
+		}
+	} else {
 		httpRouteAnnotations[common.RateLimitPolicyBackRefAnnotation] = rlpKey.String()
 		httpRoute.SetAnnotations(httpRouteAnnotations)
 		err := r.UpdateResource(ctx, httpRoute)
