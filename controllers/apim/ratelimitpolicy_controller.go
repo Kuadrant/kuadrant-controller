@@ -22,7 +22,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kuadrant/limitador-operator/api/v1alpha1"
-	istio "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istionetworkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -306,7 +305,7 @@ func (r *RateLimitPolicyReconciler) reconcileWASMEnvoyFilters(ctx context.Contex
 			return err
 		}
 
-		err = r.ReconcileResource(ctx, &istio.EnvoyFilter{}, ef, kuadrantistioutils.WASMEnvoyFilterPluginMutator)
+		err = r.ReconcileResource(ctx, &istionetworkingv1alpha3.EnvoyFilter{}, ef, kuadrantistioutils.WASMEnvoyFilterPluginMutator)
 		if err != nil {
 			return err
 		}
