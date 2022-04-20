@@ -193,6 +193,13 @@ func EnvoyFilterRatelimitsUnstructured(rateLimits []*apimv1alpha1.RateLimit) []m
 	return envoyRateLimits
 }
 
+func WASMEnvoyFilterKey(gwKey client.ObjectKey) client.ObjectKey {
+	return client.ObjectKey{
+		Name:      fmt.Sprintf("kuadrant-%s-wasm-ratelimits", gwKey.Name),
+		Namespace: gwKey.Namespace,
+	}
+}
+
 // WASMEnvoyFilter returns desired WASM envoy filter
 // - Pre-Authorization ratelimit wasm filter
 // - Post-Authorization ratelimit wasm filter
@@ -338,9 +345,10 @@ func WASMEnvoyFilter(rlp *apimv1alpha1.RateLimitPolicy, gwKey client.ObjectKey, 
 	finalPatches = append(finalPatches, preAuthFilterPatch, postAuthFilterPatch,
 		LimitadorClusterEnvoyPatch(), WasmClusterEnvoyPatch())
 
+	wasmKey := WASMEnvoyFilterKey(gwKey)
 	factory := EnvoyFilterFactory{
-		ObjectName: fmt.Sprintf("kuadrant-%s-wasm-ratelimits", gwKey.Name),
-		Namespace:  gwKey.Namespace,
+		ObjectName: wasmKey.Name,
+		Namespace:  wasmKey.Namespace,
 		Patches:    finalPatches,
 		Labels:     gwLabels,
 	}
