@@ -2,9 +2,11 @@ package apim
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
+	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 	secv1beta1types "istio.io/api/security/v1beta1"
 	"istio.io/api/type/v1beta1"
@@ -86,12 +88,24 @@ func (r *AuthPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl.Requ
 func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
 	logger := logr.FromContext(ctx)
 
+	if err := ap.Validate(); err != nil {
+		return err
+	}
+
+	if err := r.reconcileNetworkResourceBackReference(ctx, ap); err != nil {
+		return err
+	}
+
 	httpRoute, err := r.fetchHTTPRoute(ctx, ap)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("referenced HTTPRoute not found")
 			return nil
 		}
+		return err
+	}
+
+	if err := common.TargetableRoute(httpRoute); err != nil {
 		return err
 	}
 
@@ -105,6 +119,12 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 		// convert []Rule  to []*Rule
 		rulePtrSlice := []*secv1beta1types.Rule{}
 		for idx := range ap.Spec.Rules {
+			// Force hostname usage from HTTPRoute
+			for _, toRule := range ap.Spec.Rules[idx].To {
+				if toRule.Operation != nil {
+					toRule.Operation.Hosts = HostnamesToStrings(httpRoute.Spec.Hostnames)
+				}
+			}
 			rulePtrSlice = append(rulePtrSlice, &ap.Spec.Rules[idx])
 		}
 
@@ -130,6 +150,39 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 		err := r.ReconcileResource(ctx, &secv1beta1resources.AuthorizationPolicy{}, &authPolicy, alwaysUpdateAuthPolicy)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			logger.Error(err, "ReconcileResource failed to create/update AuthorizationPolicy resource")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *AuthPolicyReconciler) reconcileNetworkResourceBackReference(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
+	logger := logr.FromContext(ctx)
+	httpRoute, err := r.fetchHTTPRoute(ctx, ap)
+	if err != nil {
+		// The object should also exist
+		return err
+	}
+
+	// Reconcile the back reference:
+	httpRouteAnnotations := httpRoute.GetAnnotations()
+	if httpRouteAnnotations == nil {
+		httpRouteAnnotations = map[string]string{}
+	}
+
+	apKey := client.ObjectKeyFromObject(ap)
+	val, present := httpRouteAnnotations[common.AuthPolicyBackRefAnnotation]
+	if present {
+		if val != apKey.String() {
+			return fmt.Errorf("the target HTTPRoute {%s} is already referenced by authpolicy %s", client.ObjectKeyFromObject(httpRoute), apKey.String())
+		}
+	} else {
+		httpRouteAnnotations[common.AuthPolicyBackRefAnnotation] = apKey.String()
+		httpRoute.SetAnnotations(httpRouteAnnotations)
+		err := r.UpdateResource(ctx, httpRoute)
+		logger.V(1).Info("reconcileNetworkResourceBackReference: update HTTPRoute", "httpRoute", client.ObjectKeyFromObject(httpRoute), "err", err)
+		if err != nil {
 			return err
 		}
 	}
@@ -205,7 +258,7 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&apimv1alpha1.AuthPolicy{}).
 		Watches(
 			&source.Kind{Type: &gatewayapiv1alpha2.HTTPRoute{}},
-			handler.EnqueueRequestsFromMapFunc(HTTPRouteEventMapper.Map),
+			handler.EnqueueRequestsFromMapFunc(HTTPRouteEventMapper.MapToAuthPolicy),
 		).
 		Complete(r)
 }

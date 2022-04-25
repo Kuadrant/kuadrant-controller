@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	securityv1beta1 "istio.io/api/security/v1beta1"
@@ -43,4 +45,19 @@ type AuthPolicyList struct {
 
 func init() {
 	SchemeBuilder.Register(&AuthPolicy{}, &AuthPolicyList{})
+}
+
+func (ap *AuthPolicy) Validate() error {
+	if ap.Spec.TargetRef.Group != gatewayapiv1alpha2.Group("gateway.networking.k8s.io") {
+		return fmt.Errorf("invalid targetRef.Group %s. The only supported group is gateway.networking.k8s.io", ap.Spec.TargetRef.Group)
+	}
+
+	if ap.Spec.TargetRef.Kind != gatewayapiv1alpha2.Kind("HTTPRoute") {
+		return fmt.Errorf("invalid targetRef.Kind %s. The only supported kind is HTTPRoute", ap.Spec.TargetRef.Kind)
+	}
+
+	if ap.Spec.TargetRef.Namespace != nil && string(*ap.Spec.TargetRef.Namespace) != ap.Namespace {
+		return fmt.Errorf("invalid targetRef.Namespace %s. Currently only supporting references to the same namespace", *ap.Spec.TargetRef.Namespace)
+	}
+	return nil
 }
