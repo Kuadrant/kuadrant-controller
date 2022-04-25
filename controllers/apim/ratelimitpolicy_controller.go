@@ -373,7 +373,6 @@ func (r *RateLimitPolicyReconciler) validateHTTPRoute(ctx context.Context, rlp *
 	// Check HTTProute parents (gateways) in the status object
 	// if any of the current parent gateways reports not "Admitted", return error
 	for _, parentRef := range httpRoute.Spec.CommonRouteSpec.ParentRefs {
-
 		routeParentStatus := func(pRef gatewayapiv1alpha2.ParentRef) *gatewayapiv1alpha2.RouteParentStatus {
 			for idx := range httpRoute.Status.RouteStatus.Parents {
 				if reflect.DeepEqual(pRef, httpRoute.Status.RouteStatus.Parents[idx].ParentRef) {
