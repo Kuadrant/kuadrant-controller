@@ -5,6 +5,8 @@ import (
 
 	"github.com/kuadrant/limitador-operator/api/v1alpha1"
 	istiosecurityv1beta1 "istio.io/client-go/pkg/apis/security/v1beta1"
+	meta "k8s.io/apimachinery/pkg/api/meta"
+	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -47,4 +49,16 @@ func alwaysUpdateRateLimit(existingObj, desiredObj client.Object) (bool, error) 
 	existing.Spec = desired.Spec
 	existing.Annotations = desired.Annotations
 	return true, nil
+}
+
+func TargetableRoute(httpRoute *gatewayapiv1alpha2.HTTPRoute) error {
+	for _, parent := range httpRoute.Status.Parents { // no parent mean policies will affect nothing.
+		if len(parent.Conditions) == 0 {
+			return fmt.Errorf("unable to verify targetability: no condition found on status")
+		}
+		if meta.IsStatusConditionFalse(parent.Conditions, "Accepted") {
+			return fmt.Errorf("httproute rejected")
+		}
+	}
+	return nil
 }

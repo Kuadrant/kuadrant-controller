@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 //TODO: move the const to a proper place, or get it from config
@@ -90,18 +89,4 @@ func MergeMapStringString(existing *map[string]string, desired map[string]string
 	}
 
 	return modified
-}
-
-func TargetableRoute(httpRoute *gatewayapiv1alpha2.HTTPRoute) error {
-	for _, parent := range httpRoute.Status.Parents { // no parent mean policies will affect nothing.
-		if len(parent.Conditions) == 0 {
-			return fmt.Errorf("unable to verify targetability: no condition found on status")
-		}
-		for _, condition := range parent.Conditions {
-			if condition.Type != "Accepted" || string(condition.Status) != "True" {
-				return fmt.Errorf("route rejected: %s", condition.Reason)
-			}
-		}
-	}
-	return nil
 }

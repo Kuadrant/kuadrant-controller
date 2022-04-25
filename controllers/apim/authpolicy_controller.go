@@ -105,7 +105,7 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 		return err
 	}
 
-	if err := common.TargetableRoute(httpRoute); err != nil {
+	if err := TargetableRoute(httpRoute); err != nil {
 		return err
 	}
 
