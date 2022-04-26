@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"errors"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,18 +13,27 @@ import (
 // +kubebuilder:validation:Enum=ALLOW;CUSTOM;DENY;AUDIT
 type AuthPolicyAction string
 
-type AuthPolicySpec struct {
-	// TargetRef identifies an API object to apply policy to.
-	TargetRef gatewayapiv1alpha2.PolicyTargetReference `json:"targetRef"`
-
+type AuthPolicyConfig struct {
 	// The action to take if the request is matches with the rules.
-	Action AuthPolicyAction `json:"action,omitempty"`
+	Action AuthPolicyAction `json:"action"`
 
 	// A list of rules to match the request. A match occurs when at least one rule matches the request.
 	Rules []securityv1beta1.Rule `json:"rules,omitempty"`
 
+	// +kubebuilder:default=""
 	// Specifies detailed configuration of the CUSTOM action. Must be used only with CUSTOM action.
-	Provider securityv1beta1.AuthorizationPolicy_ExtensionProvider `json:"provider,omitempty"`
+	Provider string `json:"provider,omitempty"`
+}
+
+type AuthPolicySpec struct {
+	// TargetRef identifies an API object to apply policy to.
+	TargetRef gatewayapiv1alpha2.PolicyTargetReference `json:"targetRef"`
+
+	// +listType=map
+	// +listMapKey=action
+	// +listMapKey=provider
+	// Policy per action type but also per provider if using custom type.
+	PolicyConfigs []*AuthPolicyConfig `json:"policy,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -58,6 +68,12 @@ func (ap *AuthPolicy) Validate() error {
 
 	if ap.Spec.TargetRef.Namespace != nil && string(*ap.Spec.TargetRef.Namespace) != ap.Namespace {
 		return fmt.Errorf("invalid targetRef.Namespace %s. Currently only supporting references to the same namespace", *ap.Spec.TargetRef.Namespace)
+	}
+
+	for _, policyConfig := range ap.Spec.PolicyConfigs {
+		if string(policyConfig.Action) != "CUSTOM" && len(policyConfig.Provider) > 0 {
+			return errors.New("provider field is only allowed with action type CUSTOM")
+		}
 	}
 	return nil
 }

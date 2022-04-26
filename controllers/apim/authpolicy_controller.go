@@ -116,41 +116,49 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 		}
 		gwName := string(parentRef.Name)
 
-		// convert []Rule  to []*Rule
-		rulePtrSlice := []*secv1beta1types.Rule{}
-		for idx := range ap.Spec.Rules {
-			// Force hostname usage from HTTPRoute
-			for _, toRule := range ap.Spec.Rules[idx].To {
-				if toRule.Operation != nil {
-					toRule.Operation.Hosts = HostnamesToStrings(httpRoute.Spec.Hostnames)
+		for _, policyConfig := range ap.Spec.PolicyConfigs {
+			// convert []Rule  to []*Rule
+			rulePtrSlice := []*secv1beta1types.Rule{}
+			for idx := range policyConfig.Rules {
+				// TODO(rahulanand16nov): Do the check and append instead of force hostname from httproute
+				for _, toRule := range policyConfig.Rules[idx].To {
+					if toRule.Operation != nil {
+						toRule.Operation.Hosts = HostnamesToStrings(httpRoute.Spec.Hostnames)
+					}
+				}
+				rulePtrSlice = append(rulePtrSlice, &policyConfig.Rules[idx])
+			}
+
+			actionInt := secv1beta1types.AuthorizationPolicy_Action_value[string(policyConfig.Action)]
+
+			authPolicy := secv1beta1resources.AuthorizationPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					// TODO(rahulanand16nov): take care of multiple custom action policies with different providers
+					Name:      getAuthPolicyName(gwName, httpRoute.Name, string(policyConfig.Action)),
+					Namespace: gwNamespace,
+				},
+				Spec: secv1beta1types.AuthorizationPolicy{
+					Action: secv1beta1types.AuthorizationPolicy_Action(actionInt),
+					Rules:  rulePtrSlice,
+					Selector: &v1beta1.WorkloadSelector{
+						MatchLabels: map[string]string{}, // TODO(rahulanand16nov): fetch from gateway
+					},
+				},
+			}
+
+			if string(policyConfig.Action) == "CUSTOM" {
+				authPolicy.Spec.ActionDetail = &secv1beta1types.AuthorizationPolicy_Provider{
+					Provider: &secv1beta1types.AuthorizationPolicy_ExtensionProvider{
+						Name: policyConfig.Provider,
+					},
 				}
 			}
-			rulePtrSlice = append(rulePtrSlice, &ap.Spec.Rules[idx])
-		}
 
-		actionInt := secv1beta1types.AuthorizationPolicy_Action_value[string(ap.Spec.Action)]
-
-		authPolicy := secv1beta1resources.AuthorizationPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      getAuthPolicyName(gwName, httpRoute.Name),
-				Namespace: gwNamespace,
-			},
-			Spec: secv1beta1types.AuthorizationPolicy{
-				Action: secv1beta1types.AuthorizationPolicy_Action(actionInt),
-				Rules:  rulePtrSlice,
-				ActionDetail: &secv1beta1types.AuthorizationPolicy_Provider{
-					Provider: &ap.Spec.Provider,
-				},
-				Selector: &v1beta1.WorkloadSelector{
-					MatchLabels: map[string]string{}, // TODO(rahulanand16nov): fetch from gateway
-				},
-			},
-		}
-
-		err := r.ReconcileResource(ctx, &secv1beta1resources.AuthorizationPolicy{}, &authPolicy, alwaysUpdateAuthPolicy)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			logger.Error(err, "ReconcileResource failed to create/update AuthorizationPolicy resource")
-			return err
+			err := r.ReconcileResource(ctx, &secv1beta1resources.AuthorizationPolicy{}, &authPolicy, alwaysUpdateAuthPolicy)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				logger.Error(err, "ReconcileResource failed to create/update AuthorizationPolicy resource")
+				return err
+			}
 		}
 	}
 
@@ -210,20 +218,22 @@ func (r *AuthPolicyReconciler) removeIstioAuthPolicy(ctx context.Context, ap *ap
 		}
 		gwName := string(parentRef.Name)
 
-		authPolicyKey := client.ObjectKey{
-			Namespace: gwNamespace,
-			Name:      getAuthPolicyName(gwName, httpRoute.Name),
-		}
+		for _, policyConfig := range ap.Spec.PolicyConfigs {
+			authPolicyKey := client.ObjectKey{
+				Namespace: gwNamespace,
+				Name:      getAuthPolicyName(gwName, httpRoute.Name, string(policyConfig.Action)),
+			}
 
-		istioAuthPolicy := &secv1beta1resources.AuthorizationPolicy{}
-		if err := r.GetResource(ctx, authPolicyKey, istioAuthPolicy); err != nil {
-			logger.Error(err, "failed to fetch Istio's AuthorizationPolicy")
-			return err
-		}
+			istioAuthPolicy := &secv1beta1resources.AuthorizationPolicy{}
+			if err := r.GetResource(ctx, authPolicyKey, istioAuthPolicy); err != nil {
+				logger.Error(err, "failed to fetch Istio's AuthorizationPolicy")
+				return err
+			}
 
-		if err := r.DeleteResource(ctx, istioAuthPolicy); err != nil {
-			logger.Error(err, "failed to delete Istio's AuthorizationPolicy")
-			return err
+			if err := r.DeleteResource(ctx, istioAuthPolicy); err != nil {
+				logger.Error(err, "failed to delete Istio's AuthorizationPolicy")
+				return err
+			}
 		}
 	}
 
