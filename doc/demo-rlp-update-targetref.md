@@ -12,7 +12,7 @@ kubectl apply -f examples/toystore/toystore.yaml
 
 Create `toystore` HTTPRoute to configure routing to the toystore service
 
-```
+```yaml
 kubectl apply -f - <<EOF
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2
@@ -49,7 +49,7 @@ curl -v -H 'Host: api.toystore.com' http://localhost:9080/toy
 
 Rate limit `toystore` HTTPRoute
 
-```yaml=
+```yaml
 kubectl apply -f - <<EOF
 ---
 apiVersion: apim.kuadrant.io/v1alpha1
@@ -87,7 +87,7 @@ Add a second HTTPRoute: `carstore`
 
 ![](https://i.imgur.com/ruabBi3.png)
 
-```yaml=
+```yaml
 kubectl apply -f - <<EOF
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2
