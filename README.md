@@ -11,6 +11,7 @@
 * [Getting started](#getting-started)
 * [Demos](#demos)
   * [Updating the RateLimitPolicy `targetRef` attribute](/doc/demo-rlp-update-targetref.md)
+  * [Authenticated rate limiting](/doc/demo-rlp-authenticated.md)
 * [Contributing](#contributing)
 * [Licensing](#licensing)
 
@@ -265,6 +266,11 @@ curl -v -H 'Host: api.toystore.com' -H 'Authorization: APIKEY ALICEKEYFORDEMO' -
 
 This demo shows how the kuadrant's controller applies the rate limit policy to the new HTTPRoute
 object and cleans up rate limit configuration to the HTTPRoute object no longer referenced by the policy.
+
+### [Authenticated rate limiting](/doc/demo-rlp-authenticated.md)
+
+This demo shows how to configure rate limiting after authentication stage and rate limit configuration
+is per API key basis.
 
 ## Contributing
 

@@ -1,3 +1,10 @@
+## Updating the RateLimitPolicy `targetRef` attribute
+
+This demo shows how the kuadrant's controller applies the rate limit policy to the new HTTPRoute
+object and cleans up rate limit configuration to the HTTPRoute object no longer referenced by the policy.
+
+### Steps
+
 Create local cluster and deploy kuadrant
 
 ```
