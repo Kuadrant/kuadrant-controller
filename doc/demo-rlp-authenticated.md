@@ -51,31 +51,16 @@ Check `toystore` HTTPRoute works
 ```
 curl -v -H 'Host: api.toystore.com' http://localhost:9080/toy
 ```
-Create AuthPolicy object
 
-```yaml=
-kubectl apply -f -<<EOF
-apiVersion: apim.kuadrant.io/v1alpha1
-kind: AuthPolicy
-metadata:
-  name: toystore
-spec:
-  targetRef:
-    group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: toystore
-  rules:
-  - to:
-    - operation:
-        hosts: ["api.toystore.com"]
-  action: CUSTOM
-  provider:
-    name: kuadrant-authorization
-EOF
+Annotate HTTPRoute with Kuadrant auth provider to create AuthorizationPolicy
+
 ```
+kubectl annotate httproute/toystore kuadrant.io/auth-provider=kuadrant-authorization
+```
+
 Create Authorino's AuthConfig and API key secrets
 
-```yaml=
+```yaml
 kubectl apply -f -<<EOF
 apiVersion: authorino.kuadrant.io/v1beta1
 kind: AuthConfig
@@ -116,7 +101,7 @@ stringData:
 type: Opaque
 EOF
 ```
-Check `toystotre` HTTPRoute requires API key
+Check `toystore` HTTPRoute requires API key
 
 ```
 curl -v -H 'Authorization: APIKEY KEY-A' -H 'Host: api.toystore.com' http://localhost:9080/toy
@@ -125,7 +110,7 @@ curl -v -H 'Authorization: APIKEY KEY-A' -H 'Host: api.toystore.com' http://loca
 Add rate limit policy to protect per API key basis
 
 
-```yaml=
+```yaml
 kubectl apply -f -<<EOF
 ---
 apiVersion: apim.kuadrant.io/v1alpha1
