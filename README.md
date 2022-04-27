@@ -9,6 +9,8 @@
 * [Overview](#overview)
 * [CustomResourceDefinitions](#customresourcedefinitions)
 * [Getting started](#getting-started)
+* [Demos](#demos)
+  * [Updating the RateLimitPolicy `targetRef` attribute](/doc/demo-rlp-update-targetref.md)
 * [Contributing](#contributing)
 * [Licensing](#licensing)
 
@@ -240,7 +242,7 @@ To verify creation:
 ```
 kubectl get authorizationpolicy -A
 NAMESPACE         NAME                                          AGE
-kuadrant-system   on-kuadrant-gwapi-gateway-using-hr-toystore   3m36s
+kuadrant-system   on-kuadrant-gwapi-gateway-using-toystore-custom   81s
 ```
 
 9.- Verify authentication
@@ -256,6 +258,13 @@ Should return `200 OK`
 ```
 curl -v -H 'Host: api.toystore.com' -H 'Authorization: APIKEY ALICEKEYFORDEMO' -X POST http://localhost:9080/admin/toy
 ```
+
+## Demos
+
+### [Updating the RateLimitPolicy `targetRef` attribute](/doc/demo-rlp-update-targetref.md)
+
+This demo shows how the kuadrant's controller applies the rate limit policy to the new HTTPRoute
+object and cleans up rate limit configuration to the HTTPRoute object no longer referenced by the policy.
 
 ## Contributing
 
