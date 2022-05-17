@@ -39,6 +39,7 @@ func (v *WasmPluginFactory) WasmPlugin() *istioextensionv1alpha3.WasmPlugin {
 			},
 			Url:          "oci://quay.io/rahanand/wasm-shim:latest", // TODO: take this from Environment.
 			PluginConfig: v.Config,
+			Phase:        v.Phase,
 		},
 	}
 }

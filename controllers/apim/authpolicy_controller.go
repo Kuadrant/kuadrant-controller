@@ -120,13 +120,30 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 			// convert []Rule  to []*Rule
 			rulePtrSlice := []*secv1beta1types.Rule{}
 			for idx := range policyConfig.Rules {
-				// TODO(rahulanand16nov): Do the check and append instead of force hostname from httproute
-				for _, toRule := range policyConfig.Rules[idx].To {
-					if toRule.Operation != nil {
-						toRule.Operation.Hosts = HostnamesToStrings(httpRoute.Spec.Hostnames)
-					}
+				rule := &secv1beta1types.Rule{
+					To: []*secv1beta1types.Rule_To{},
 				}
-				rulePtrSlice = append(rulePtrSlice, &policyConfig.Rules[idx])
+				// TODO(rahulanand16nov): Do the check and append instead of force hostname from httproute
+				for _, operation := range policyConfig.Rules[idx].Operations {
+					if operation != nil {
+						operation.Hosts = HostnamesToStrings(httpRoute.Spec.Hostnames)
+					}
+					// TODO(rahul): we'll revert back to using the structs directly once
+					// https://github.com/kubernetes-sigs/controller-tools/pull/584 is present in a release.
+					toRule := &secv1beta1types.Rule_To{
+						Operation: &secv1beta1types.Operation{
+							NotHosts:   operation.NotHosts,
+							Ports:      operation.Ports,
+							NotPorts:   operation.NotPorts,
+							Methods:    operation.Methods,
+							NotMethods: operation.NotMethods,
+							Paths:      operation.Paths,
+							NotPaths:   operation.NotPaths,
+						},
+					}
+					rule.To = append(rule.To, toRule)
+				}
+				rulePtrSlice = append(rulePtrSlice, rule)
 			}
 
 			actionInt := secv1beta1types.AuthorizationPolicy_Action_value[string(policyConfig.Action)]
