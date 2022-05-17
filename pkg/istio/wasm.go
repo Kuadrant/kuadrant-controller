@@ -7,6 +7,8 @@ import (
 	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
+const PatchedLimitadorClusterName = "rate-limit-cluster"
+
 // wasm-shim API structs
 type Rule struct {
 	Operations []*apimv1alpha1.Operation       `json:"operations"`
@@ -67,12 +69,12 @@ func PluginPolicyFromRateLimitPolicy(rlp *apimv1alpha1.RateLimitPolicy, pluginSt
 	return pluginPolicy
 }
 
-func MergeMapStringPluginPolicy(modified *bool, existing *map[string]PluginPolicy, desired map[string]PluginPolicy) {
+func MergeMapStringPluginPolicy(modified *bool, existing *map[string]PluginPolicy, desired *map[string]PluginPolicy) {
 	if *existing == nil {
 		*existing = map[string]PluginPolicy{}
 	}
 
-	for desiredKey, desiredPluginPolicy := range desired {
+	for desiredKey, desiredPluginPolicy := range *desired {
 		existingPluginPolicy, ok := (*existing)[desiredKey]
 		if !ok || !reflect.DeepEqual(existingPluginPolicy, desiredPluginPolicy) {
 			(*existing)[desiredKey] = desiredPluginPolicy

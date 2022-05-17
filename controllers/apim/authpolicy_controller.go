@@ -86,7 +86,7 @@ func (r *AuthPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl.Requ
 
 // IstioAuthPolicy generates Istio's AuthorizationPolicy using Kuadrant's AuthPolicy
 func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
-	logger := logr.FromContext(ctx)
+	logger, _ := logr.FromContext(ctx)
 
 	if err := ap.Validate(); err != nil {
 		return err
@@ -166,7 +166,7 @@ func (r *AuthPolicyReconciler) reconcileAuthPolicy(ctx context.Context, ap *apim
 }
 
 func (r *AuthPolicyReconciler) reconcileNetworkResourceBackReference(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
-	logger := logr.FromContext(ctx)
+	logger, _ := logr.FromContext(ctx)
 	httpRoute, err := r.fetchHTTPRoute(ctx, ap)
 	if err != nil {
 		// The object should also exist
@@ -199,7 +199,7 @@ func (r *AuthPolicyReconciler) reconcileNetworkResourceBackReference(ctx context
 }
 
 func (r *AuthPolicyReconciler) removeIstioAuthPolicy(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
-	logger := logr.FromContext(ctx)
+	logger, _ := logr.FromContext(ctx)
 	logger.Info("Removing Istio's AuthorizationPolicy")
 
 	httpRoute, err := r.fetchHTTPRoute(ctx, ap)
@@ -243,7 +243,7 @@ func (r *AuthPolicyReconciler) removeIstioAuthPolicy(ctx context.Context, ap *ap
 
 // fetchHTTPRoute fetches the HTTPRoute described in targetRef *within* AuthPolicy's namespace.
 func (r *AuthPolicyReconciler) fetchHTTPRoute(ctx context.Context, ap *apimv1alpha1.AuthPolicy) (*gatewayapiv1alpha2.HTTPRoute, error) {
-	logger := logr.FromContext(ctx)
+	logger, _ := logr.FromContext(ctx)
 	key := client.ObjectKey{
 		Name:      string(ap.Spec.TargetRef.Name),
 		Namespace: ap.Namespace,
