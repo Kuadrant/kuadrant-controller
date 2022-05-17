@@ -83,12 +83,12 @@ func (r *RateLimitPolicyReconciler) finalizeSingleWASMPlugins(
 	updateObject := false
 	configEmpty := false
 	// Deserialize config into PluginConfig struct
-	configJson, err := wasmPlugin.Spec.PluginConfig.MarshalJSON()
+	configJSON, err := wasmPlugin.Spec.PluginConfig.MarshalJSON()
 	if err != nil {
 		return err
 	}
 	pluginConfig := &kuadrantistioutils.PluginConfig{}
-	if err := json.Unmarshal(configJson, pluginConfig); err != nil {
+	if err := json.Unmarshal(configJSON, pluginConfig); err != nil {
 		return err
 	}
 

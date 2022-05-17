@@ -52,13 +52,13 @@ func WASMPluginKey(gwKey client.ObjectKey, stage apimv1alpha1.RateLimitStage) cl
 }
 
 func PluginConfigToWasmPluginStruct(config *PluginConfig) (*_struct.Struct, error) {
-	pluginConfigJson, err := json.Marshal(config)
+	pluginConfigJSON, err := json.Marshal(config)
 	if err != nil {
 		return nil, err
 	}
 
 	pluginConfigStruct := &_struct.Struct{}
-	if err := pluginConfigStruct.UnmarshalJSON(pluginConfigJson); err != nil {
+	if err := pluginConfigStruct.UnmarshalJSON(pluginConfigJSON); err != nil {
 		return nil, err
 	}
 	return pluginConfigStruct, nil
@@ -74,7 +74,6 @@ func WasmPlugins(rlp *apimv1alpha1.RateLimitPolicy, gwKey client.ObjectKey, gwLa
 
 	wasmPlugins := []*istioextensionv1alpha3.WasmPlugin{}
 	for stage, phase := range stagePhaseMapping {
-
 		pluginPolicy := PluginPolicyFromRateLimitPolicy(rlp, stage, hosts)
 		pluginConfig := &PluginConfig{
 			FailureModeDeny: true,
@@ -115,21 +114,21 @@ func WASMPluginMutator(existingObj, desiredObj client.Object) (bool, error) {
 	}
 
 	// Deserialize config into PluginConfig struct
-	existingConfigJson, err := existing.Spec.PluginConfig.MarshalJSON()
+	existingConfigJSON, err := existing.Spec.PluginConfig.MarshalJSON()
 	if err != nil {
 		return false, err
 	}
 	existingPluginConfig := &PluginConfig{}
-	if err := json.Unmarshal(existingConfigJson, existingPluginConfig); err != nil {
+	if err := json.Unmarshal(existingConfigJSON, existingPluginConfig); err != nil {
 		return false, err
 	}
 
-	desiredConfigJson, err := desired.Spec.PluginConfig.MarshalJSON()
+	desiredConfigJSON, err := desired.Spec.PluginConfig.MarshalJSON()
 	if err != nil {
 		return false, err
 	}
 	desiredPluginConfig := &PluginConfig{}
-	if err := json.Unmarshal(desiredConfigJson, desiredPluginConfig); err != nil {
+	if err := json.Unmarshal(desiredConfigJSON, desiredPluginConfig); err != nil {
 		return false, err
 	}
 
