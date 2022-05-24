@@ -134,7 +134,7 @@ func WASMPluginMutator(existingObj, desiredObj client.Object) (bool, error) {
 	}
 
 	patchUpdate := false
-	MergeMapStringPluginPolicy(&patchUpdate, &existingPluginConfig.PluginPolicies, &desiredPluginConfig.PluginPolicies)
+	MergeMapStringPluginPolicy(&patchUpdate, &existingPluginConfig.PluginPolicies, desiredPluginConfig.PluginPolicies)
 
 	if patchUpdate {
 		update = true

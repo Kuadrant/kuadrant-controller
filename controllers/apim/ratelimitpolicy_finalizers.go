@@ -20,7 +20,7 @@ const (
 	rateLimitPolicyFinalizer = "ratelimitpolicy.kuadrant.io/finalizer"
 )
 
-// finalizeWASMPlugins removes the configuration of this RLP from each gateway's EnvoyFilter.
+// finalizeWASMPlugins removes the configuration of this RLP from each gateway's WASMPlugins.
 func (r *RateLimitPolicyReconciler) finalizeWASMPlugins(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
 	logger, _ := logr.FromContext(ctx)
 
@@ -76,7 +76,7 @@ func (r *RateLimitPolicyReconciler) finalizeWASMPlugins(ctx context.Context, rlp
 }
 
 // finalizeSingleWASMPlugins removes the configuration of this RLP
-// If the envoyfilter ends up with empty conf, the resource will be removed.
+// If the WASMPlugin ends up with empty conf, the resource will be removed.
 func (r *RateLimitPolicyReconciler) finalizeSingleWASMPlugins(
 	ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy, wasmPlugin *istioextensionv1alpha3.WasmPlugin,
 ) error {

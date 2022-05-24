@@ -69,12 +69,12 @@ func PluginPolicyFromRateLimitPolicy(rlp *apimv1alpha1.RateLimitPolicy, pluginSt
 	return pluginPolicy
 }
 
-func MergeMapStringPluginPolicy(modified *bool, existing *map[string]PluginPolicy, desired *map[string]PluginPolicy) {
+func MergeMapStringPluginPolicy(modified *bool, existing *map[string]PluginPolicy, desired map[string]PluginPolicy) {
 	if *existing == nil {
 		*existing = map[string]PluginPolicy{}
 	}
 
-	for desiredKey, desiredPluginPolicy := range *desired {
+	for desiredKey, desiredPluginPolicy := range desired {
 		existingPluginPolicy, ok := (*existing)[desiredKey]
 		if !ok || !reflect.DeepEqual(existingPluginPolicy, desiredPluginPolicy) {
 			(*existing)[desiredKey] = desiredPluginPolicy
