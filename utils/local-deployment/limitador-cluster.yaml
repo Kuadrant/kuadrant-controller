@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  name: kuadrant-kuadrant-gwapi-gateway-wasm-ratelimits
+  name: kuadrant-limitador-cluster-entry
 spec:
   configPatches:
   - applyTo: CLUSTER
