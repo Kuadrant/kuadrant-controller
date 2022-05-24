@@ -232,7 +232,7 @@ func (r *RateLimitPolicyReconciler) reconcileNetworkResourceBackReference(ctx co
 	return nil
 }
 
-// Finds gateways with envoyFilters with rate limit configuration from the current RLP
+// Finds gateways with WASMPLugins with rate limit configuration from the current RLP
 // Delete RL conf from the current RLP from gateways not referenced by the current RLP
 // Cleans up RL conf when:
 // - HTTPRoute updates parentRefs (gateways)
@@ -302,7 +302,7 @@ func (r *RateLimitPolicyReconciler) reconcileWASMPlugins(ctx context.Context, rl
 		gwKey := currentGatewayRefs[idx]
 		gateway := &gatewayapiv1alpha2.Gateway{}
 		err := r.Client().Get(ctx, gwKey, gateway)
-		logger.V(1).Info("reconcileWASMEnvoyFilters: get Gateway", "gateway", gwKey, "err", err)
+		logger.V(1).Info("reconcileWASMPlugins: get Gateway", "gateway", gwKey, "err", err)
 		if err != nil {
 			// gateway needs to exist
 			return err
@@ -310,7 +310,7 @@ func (r *RateLimitPolicyReconciler) reconcileWASMPlugins(ctx context.Context, rl
 
 		// Reconcile two WasmPlugins per gateway
 		// Gateway API Gateway resource labels will be copied to the deployment in the automated deployment
-		// For the manual deployment, the Gateway resource labels must match deployment/pod labels or envoyfilters selector will not match
+		// For the manual deployment, the Gateway resource labels must match deployment/pod labels or WASMPlugins selector will not match
 		// https://istio.io/latest/docs/tasks/traffic-management/ingress/gateway-api/#automated-deployment
 		wps, err := kuadrantistioutils.WasmPlugins(rlp, gwKey, gateway.GetLabels(), httpRoute.Spec.Hostnames)
 		if err != nil {
