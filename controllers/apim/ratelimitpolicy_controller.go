@@ -293,6 +293,7 @@ func (r *RateLimitPolicyReconciler) cleanUpOrphanWASMPlugins(ctx context.Context
 			logger.V(1).Info("cleanUpOrphanWASMPlugins: get EnvoyFilter", "envoyfilter", efKey, "err", err)
 			if apierrors.IsNotFound(err) {
 				logger.Info("cleanUpOrphanWASMPlugins: envoyfilter not found", "envoyFilter", efKey)
+				continue
 			}
 			err = r.DeleteResource(ctx, ef)
 			if err != nil {
