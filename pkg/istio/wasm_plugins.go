@@ -16,7 +16,7 @@ import (
 	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
-var SHIM_URL = common.FetchEnv("SHIM_IMAGE", "oci://quay.io/rahanand/wasm-shim:latest")
+var shimURL = common.FetchEnv("SHIM_IMAGE", "oci://quay.io/rahanand/wasm-shim:latest")
 
 type WasmPluginFactory struct {
 	ObjectName string
@@ -40,7 +40,7 @@ func (v *WasmPluginFactory) WasmPlugin() *istioextensionv1alpha3.WasmPlugin {
 			Selector: &v1beta1.WorkloadSelector{
 				MatchLabels: v.Labels,
 			},
-			Url:          SHIM_URL, // TODO: take this from Environment.
+			Url:          shimURL, // TODO: take this from Environment.
 			PluginConfig: v.Config,
 			Phase:        v.Phase,
 		},
