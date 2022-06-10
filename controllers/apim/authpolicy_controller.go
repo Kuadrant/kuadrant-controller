@@ -166,7 +166,7 @@ func (r *AuthPolicyReconciler) reconcileAuthRules(ctx context.Context, ap *apimv
 			Spec: secv1beta1types.AuthorizationPolicy{
 				Action: secv1beta1types.AuthorizationPolicy_CUSTOM,
 				Rules: []*secv1beta1types.Rule{
-					&secv1beta1types.Rule{
+					{
 						To: ToRules,
 					},
 				},
