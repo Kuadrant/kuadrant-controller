@@ -31,7 +31,7 @@ type AuthPolicyReconciler struct {
 
 const authPolicyFinalizer = "authpolicy.kuadrant.io/finalizer"
 
-var AuthProvider = common.FetchEnv("AuthProvider", "kuadrant-authorization")
+var AuthProvider = common.FetchEnv("AUTH_PROVIDER", "kuadrant-authorization")
 
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=authpolicies,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apim.kuadrant.io,resources=authpolicies/finalizers,verbs=update
