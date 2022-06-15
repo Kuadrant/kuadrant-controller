@@ -80,8 +80,8 @@ func alwaysUpdateAuthConfig(existingObj, desiredObj client.Object) (bool, error)
 }
 
 func TargetableObject(obj client.Object) error {
-	httpRoute, isHttpRoute := obj.(*gatewayapiv1alpha2.HTTPRoute)
-	if isHttpRoute {
+	httpRoute, isHTTPRoute := obj.(*gatewayapiv1alpha2.HTTPRoute)
+	if isHTTPRoute {
 		for _, parent := range httpRoute.Status.Parents { // no parent mean policies will affect nothing.
 			if len(parent.Conditions) == 0 {
 				return errors.New("unable to verify targetability: no condition found on status")
@@ -105,8 +105,8 @@ func TargetableObject(obj client.Object) error {
 // TargetedGatewayKeys takes either HTTPRoute or Gateway object and return the list of gateways that are being referenced.
 func TargetedGatewayKeys(obj client.Object) []client.ObjectKey {
 	gwKeys := []client.ObjectKey{}
-	httpRoute, isHttpRoute := obj.(*gatewayapiv1alpha2.HTTPRoute)
-	if isHttpRoute {
+	httpRoute, isHTTPRoute := obj.(*gatewayapiv1alpha2.HTTPRoute)
+	if isHTTPRoute {
 		for _, parentRef := range httpRoute.Spec.ParentRefs {
 			gwNamespace := httpRoute.Namespace // consider gateway local if namespace is not given
 			if parentRef.Namespace != nil {
