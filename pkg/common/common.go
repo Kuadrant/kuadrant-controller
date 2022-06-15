@@ -28,7 +28,6 @@ import (
 const (
 	KuadrantNamespace             = "kuadrant-system"
 	KuadrantAuthorizationProvider = "kuadrant-authorization"
-	LimitadorServiceGrpcPort      = 8081
 
 	HTTPRouteKind      = "HTTPRoute"
 	VirtualServiceKind = "VirtualService"
@@ -41,7 +40,10 @@ const (
 )
 
 var (
-	LimitadorServiceClusterHost = fmt.Sprintf("limitador.%s.svc.cluster.local", KuadrantNamespace)
+	LimitadorNamespace          = FetchEnv("LIMITADOR_NAMESPACE", "kuadrant-system")
+	LimitadorServiceName        = FetchEnv("LIMITADOR_SERVICE_NAME", "limitador")
+	LimitadorServiceGrpcPort    = FetchEnv("LIMITADOR_SERVICE_GRPC_PORT", "8081")
+	LimitadorServiceClusterHost = fmt.Sprintf("%s.%s.svc.cluster.local", LimitadorServiceName, LimitadorNamespace)
 )
 
 func FetchEnv(key string, def string) string {
