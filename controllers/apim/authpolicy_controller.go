@@ -132,7 +132,7 @@ func (r *AuthPolicyReconciler) reconcileAuthRules(ctx context.Context, ap *apimv
 	logger, _ := logr.FromContext(ctx)
 
 	targetObj, err := r.fetchTargetObject(ctx, ap)
-	targetObjectKind := targetObj.GetObjectKind().GroupVersionKind().Kind
+	targetObjectKind := string(ap.Spec.TargetRef.Kind)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("referenced %s not found", targetObjectKind)
@@ -191,11 +191,12 @@ func (r *AuthPolicyReconciler) reconcileAuthRules(ctx context.Context, ap *apimv
 func (r *AuthPolicyReconciler) reconcileNetworkResourceBackReference(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
 	logger, _ := logr.FromContext(ctx)
 	targetObj, err := r.fetchTargetObject(ctx, ap)
-	tagetObjKind := targetObj.GetObjectKind().GroupVersionKind().Kind
 	if err != nil {
 		// The object should also exist
 		return err
 	}
+
+	targetObjKind := targetObj.GetObjectKind().GroupVersionKind().Kind
 
 	// Reconcile the back reference:
 	targetObjAnnotations := targetObj.GetAnnotations()
@@ -207,13 +208,13 @@ func (r *AuthPolicyReconciler) reconcileNetworkResourceBackReference(ctx context
 	val, present := targetObjAnnotations[common.AuthPolicyBackRefAnnotation]
 	if present {
 		if val != apKey.String() {
-			return fmt.Errorf("the target %s {%s} is already referenced by authpolicy %s", tagetObjKind, client.ObjectKeyFromObject(targetObj).String(), apKey.String())
+			return fmt.Errorf("the target %s {%s} is already referenced by authpolicy %s", targetObjKind, client.ObjectKeyFromObject(targetObj).String(), apKey.String())
 		}
 	} else {
 		targetObjAnnotations[common.AuthPolicyBackRefAnnotation] = apKey.String()
 		targetObj.SetAnnotations(targetObjAnnotations)
 		err := r.UpdateResource(ctx, targetObj)
-		logger.V(1).Info(fmt.Sprintf("reconcileNetworkResourceBackReference: update %s", tagetObjKind), tagetObjKind, client.ObjectKeyFromObject(targetObj).String(), "err", err)
+		logger.V(1).Info(fmt.Sprintf("reconcileNetworkResourceBackReference: update %s", targetObjKind), targetObjKind, client.ObjectKeyFromObject(targetObj).String(), "err", err)
 		if err != nil {
 			return err
 		}
@@ -248,7 +249,7 @@ func (r *AuthPolicyReconciler) removeIstioAuthPolicy(ctx context.Context, ap *ap
 	logger.Info("Removing Istio's AuthorizationPolicy")
 
 	targetObj, err := r.fetchTargetObject(ctx, ap)
-	targetObjectKind := targetObj.GetObjectKind().GroupVersionKind().Kind
+	targetObjectKind := string(ap.Spec.TargetRef.Kind)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("referenced %s not found", targetObjectKind)
