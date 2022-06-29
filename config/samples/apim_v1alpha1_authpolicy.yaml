@@ -12,7 +12,7 @@ spec:
   - hosts: ["*.toystore.com"]
     methods: ["DELETE", "POST"]
     paths: ["/admin*"]
-  authSchemes:
+  authScheme:
     hosts: ["api.toystore.com"]
     identity:
     - name: friends

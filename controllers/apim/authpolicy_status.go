@@ -47,7 +47,6 @@ func (r *AuthPolicyReconciler) reconcileStatus(ctx context.Context, ap *apimv1al
 	newStatus.ObservedGeneration = ap.Generation
 
 	logger.V(1).Info("Updating Status", "sequence change:", fmt.Sprintf("%v->%v", ap.Status.ObservedGeneration, newStatus.ObservedGeneration))
-	logger.V(1).Info("TEST", "AuthPolicy", apKey.String())
 	ap.Status = *newStatus
 	updateErr := r.Client().Status().Update(ctx, ap)
 	if updateErr != nil {

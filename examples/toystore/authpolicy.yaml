@@ -12,7 +12,7 @@ spec:
   - hosts: ["*.toystore.com"]
     methods: ["DELETE", "POST"]
     paths: ["/admin*"]
-  authSchemes:
+  authScheme:
     hosts: ["api.toystore.com"]
     identity:
     - name: apikey
@@ -45,7 +45,7 @@ spec:
     name: kuadrant-gwapi-gateway
   rules:
   - hosts: ["*.toystore.com"]
-  authSchemes:
+  authScheme:
     hosts: ["api.toystore.com"]
     identity:
       - name: apikey
