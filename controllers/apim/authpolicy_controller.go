@@ -138,7 +138,7 @@ func (r *AuthPolicyReconciler) reconcileAuthSchemes(ctx context.Context, ap *api
 			Name:      authConfigName(apKey),
 			Namespace: common.KuadrantNamespace,
 		},
-		Spec: *ap.Spec.AuthSchemes,
+		Spec: *ap.Spec.AuthScheme,
 	}
 	err := r.ReconcileResource(ctx, &authorinov1beta1.AuthConfig{}, authConfig, alwaysUpdateAuthConfig)
 	if err != nil && !apierrors.IsAlreadyExists(err) {

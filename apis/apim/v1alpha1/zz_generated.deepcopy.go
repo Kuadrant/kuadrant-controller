@@ -137,8 +137,8 @@ func (in *AuthPolicySpec) DeepCopyInto(out *AuthPolicySpec) {
 			}
 		}
 	}
-	if in.AuthSchemes != nil {
-		in, out := &in.AuthSchemes, &out.AuthSchemes
+	if in.AuthScheme != nil {
+		in, out := &in.AuthScheme, &out.AuthScheme
 		*out = new(v1beta1.AuthConfigSpec)
 		(*in).DeepCopyInto(*out)
 	}

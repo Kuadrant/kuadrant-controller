@@ -17,7 +17,7 @@ type AuthPolicySpec struct {
 	AuthRules []*AuthRule `json:"rules,omitempty"`
 
 	// AuthSchemes are embedded Authorino's AuthConfigs
-	AuthSchemes *authorinov1beta1.AuthConfigSpec `json:"authSchemes,omitempty"`
+	AuthScheme *authorinov1beta1.AuthConfigSpec `json:"authScheme,omitempty"`
 }
 
 type AuthRule struct {

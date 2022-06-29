@@ -33,7 +33,7 @@ spec:
             type: object
           spec:
             properties:
-              authSchemes:
+              authScheme:
                 description: AuthSchemes are embedded Authorino's AuthConfigs
                 properties:
                   authorization:
