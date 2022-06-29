@@ -61,11 +61,51 @@ spec:
 **Note:** There is no `PREAUTH`, `POSTAUTH` stage defined. Ratelimiting filter should be placed after authorization filter to enable authenticated rate limiting. In the future, `stage` can be implemented.
 
 ## Kuadrant-controller's behavior
-Multiple RLP objects can have references to a given Gateway. Similarly, multiple RLP objects can have references to a given HTTPRoute. The kuadrant controller will iterate over the referenced gateways and aggregate all the rate limit policies that apply for each gateway, including RLP targeting HTTPRoutes.
+
+Multiple RLP objects can have references to a single Gateway.
+Similarly, multiple RLP objects can have references to a single HTTPRoute.
+
+The kuadrant controller will aggregate all the rate
+limit policies that apply for each gateway, including RLP targeting HTTPRoutes and Gateways.
 
 #### "VirtualHosting" RateLimitPolicies
 
-Rate limit actions will be aggregated and stored in an tree based structure indexed by the domain name(s) that apply. The domain names, or virtualhosts, are defined based on the HTTPRoute's [hostnames](https://gateway-api.sigs.k8s.io/v1alpha2/references/spec/#gateway.networking.k8s.io/v1alpha2.HTTPRouteSpec) and Gateway's Listener's [Hostname](https://gateway-api.sigs.k8s.io/v1alpha2/references/spec/#gateway.networking.k8s.io%2fv1alpha2.Listener).
+Rate limit policies are scoped by the domains defined at the referenced HTTPRoute's
+[hostnames](https://gateway-api.sigs.k8s.io/v1alpha2/references/spec/#gateway.networking.k8s.io/v1alpha2.HTTPRouteSpec)
+and Gateway's Listener's [Hostname](https://gateway-api.sigs.k8s.io/v1alpha2/references/spec/#gateway.networking.k8s.io%2fv1alpha2.Listener).
+
+#### Multiple HTTPRoutes with the same hostname
+
+When there are multiple HTTPRoutes with the same hostname, HTTPRoutes are all admitted and
+envoy merge the routing configuration in the same virtualhost. In these cases, the control plane
+has to "merge" the rate limit configuration into a single entry for the wasm filter.
+
+#### Overlapping HTTPRoutes
+
+If some RLP targets a route for `*.com` and other RLP targets another route for `api.com`,
+the control plane does not do any *merging*.
+A request coming for `api.com` will be rate limited with the rules from the RLP targeting
+the route `api.com`.
+Also, a request coming for `other.com` will be rate limited with the rules from the RLP targeting
+the route `*.com`.
+
+### examples
+
+RLP A -> HTTPRoute A (`api.toystore.com`) -> Gateway G (`*.com`)
+
+RLP B -> HTTPRoute B (`other.toystore.com`) -> Gateway G (`*.com`)
+
+RLP H -> HTTPRoute H (`*.toystore.com`) -> Gateway G (`*.com`)
+
+RLP G -> Gateway G (`*.com`)
+
+Request 1 (`api.toystore.com`) -> apply RLP A and RLP G
+
+Request 2 (`other.toystore.com`) -> apply RLP B and RLP G
+
+Request 3 (`unknown.toystore.com`) -> apply RLP H and RLP G
+
+Request 4 (`other.com`) -> apply RLP G
 
 #### rate limit domain / limitador namespace
 
