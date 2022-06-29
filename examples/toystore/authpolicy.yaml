@@ -13,7 +13,7 @@ spec:
     methods: ["DELETE", "POST"]
     paths: ["/admin*"]
   authSchemes:
-  - hosts: ["api.toystore.com"]
+    hosts: ["api.toystore.com"]
     identity:
     - name: apikey
       apiKey:
@@ -46,7 +46,7 @@ spec:
   rules:
   - hosts: ["*.toystore.com"]
   authSchemes:
-  - hosts: ["api.toystore.com"]
+    hosts: ["api.toystore.com"]
     identity:
       - name: apikey
         apiKey:
