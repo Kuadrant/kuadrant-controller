@@ -62,8 +62,13 @@ spec:
 
 ## Kuadrant-controller's behavior
 
-Multiple RLP objects can have references to a single Gateway.
-Similarly, multiple RLP objects can have references to a single HTTPRoute.
+One HTTPRoute can only be targeted by one rate limit policy. 
+
+Similarly, one Gateway can only be targeted by one rate limit policy.
+
+However, indirectly, one gateway will be affected by multiple rate limit policies. 
+It is by design of the Gateway API, one gateway can be referenced by multiple HTTPRoute objects. 
+Furthermore, one HTTPRoute can reference multiple gateways.
 
 The kuadrant controller will aggregate all the rate
 limit policies that apply for each gateway, including RLP targeting HTTPRoutes and Gateways.
