@@ -62,12 +62,12 @@ spec:
 
 ## Kuadrant-controller's behavior
 
-One HTTPRoute can only be targeted by one rate limit policy. 
+One HTTPRoute can only be targeted by one rate limit policy.
 
 Similarly, one Gateway can only be targeted by one rate limit policy.
 
-However, indirectly, one gateway will be affected by multiple rate limit policies. 
-It is by design of the Gateway API, one gateway can be referenced by multiple HTTPRoute objects. 
+However, indirectly, one gateway will be affected by multiple rate limit policies.
+It is by design of the Gateway API, one gateway can be referenced by multiple HTTPRoute objects.
 Furthermore, one HTTPRoute can reference multiple gateways.
 
 The kuadrant controller will aggregate all the rate
@@ -118,7 +118,7 @@ The kuadrant controller will add `domain` attribute of the Envoy's [Rate Limit S
 
 The value of this domain/namespace seems to be related to the virtualhost for which rate limit applies.
 
-## Schema of the `PluginConfig` struct
+## Schema of the WASM filter configuration object: the `PluginConfig`
 
 Currently the PluginConfig looks like this:
 
@@ -147,11 +147,12 @@ ratelimitpolicies:
     upstream_cluster: rate-limit-cluster # Limitador address reference
     domain: toystore-app # RLS protocol domain value
 ```
-Proposed new design:
+
+Proposed new design for the WASM filter configuration object (`PluginConfig` struct):
 
 ```yaml
 #  The filter’s behaviour in case the rate limiting service does not respond back. When it is set to true, Envoy will not allow traffic in case of communication failure between rate limiting service and the proxy.
-failureModeDeny: true
+failure_mode_deny: true
 rate_limit_policies:
   - name: toystore
     rate_limit_domain: toystore-app
@@ -176,17 +177,26 @@ Update highlights:
 
 ## WASM-SHIM
 
-Each rate limit policy has a logical name and a set of hostnames to activate it based on the incoming request’s host header.
+WASM filter rate limit policies are not exactly the same as user managed RateLimitPolicy
+custom resources. The WASM filter rate limit policies is part of the  internal configuration
+and therefore not exposed to the end user.
 
-The WASM-SHIM builds a tree based data structure holding the rate limit policies.
+At the WASM filter level, there are no route level or gateway level rate limit policies.
+The rate limit policies in the wasm plugin configuration may not map 1:1 to
+user managed RateLimitPolicy custom resources. WASM rate limit policies have an internal logical
+name and a set of hostnames to activate it based on the incoming request’s host header.
+
+The WASM filter builds a tree based data structure holding the rate limit policies.
 The longest (sub)domain match is used to select the policy to be applied.
 Only one policy is being applied per invocation.
 
-The plugin object contains a list of configurations to build a list of Envoy's RLS descriptors.
-These policy configurations are defined at
+#### rate limit configurations
+
+The WASM filter configuration object contains a list of rate limit configurations
+to build a list of Envoy's RLS descriptors. These configurations are defined at
 
 ```
-rate_limit_policies[*].gatewat_actions[*].configurations
+rate_limit_policies[*].gateway_actions[*].configurations
 ```
 
 For example:
@@ -199,28 +209,75 @@ configurations:
         descriptor_value: "1"
 ```
 
-Each configuration produces, at most, one descriptor. Depending on the incoming request, one configuration may or may not produce a rate limit descriptor.
+How to read the policy:
 
-Each policy configuration has associated, optionally, a set of rules to match. Rules allow matching `hosts` and/or `methods` and/or `paths`. Matching occurs when at least one rule applies against the incoming request. If rules are not set, it is equivalent to matching all the requests.
+* Each configuration produces, at most, one descriptor. Depending on the incoming request, one configuration may or may not produce a rate limit descriptor.
 
-For example:
+* Each policy configuration has associated, optionally, a set of rules to match. Rules allow matching `hosts` and/or `methods` and/or `paths`. Matching occurs when at least one rule applies against the incoming request. If rules are not set, it is equivalent to matching all the requests.
+
+* Each configuration object defines a list of actions. Each action may (or may not) produce a descriptor entry (descriptor list item). If an action cannot append a descriptor entry, no descriptor is generated for the configuration.
+
+*Note*: The external rate limit service will be called when the `gateway_actions` object produces at least one not empty descriptor.
+
+#### example
+
+WASM filter rate limit policy for `*.toystore.com`. I want some rate limit descriptors configuration
+only for `api.toystore.com` and another set of descriptors for `admin.toystore.com`.
+The wasm filter config would look like this:
 
 ```yaml
-gateway_actions:
+failure_mode_deny: true
+rate_limit_policies:
+  - name: toystore
+    rate_limit_domain: toystore-app
+    upstream_cluster: rate-limit-cluster
+    hostnames: ["*.toystore.com"]
+    gateway_actions:
+      - configurations:  # no rules. Applies to all *.toystore.com traffic
+          - actions:
+              - generic_key:
+                  descriptor_key: toystore-app
+                  descriptor_value: "1"
       - rules:
-          - paths: ["/admin/toy"]
-            methods: ["GET"]
-            hosts: ["pets.toystore.com"]
+          - hosts: ["api.toystore.com"]
         configurations:
           - actions:
-            - generic_key:
-                descriptor_key: admin
-                descriptor_value: "1"
+              - generic_key:
+                  descriptor_key: api
+                  descriptor_value: "1"
+      - rules:
+          - hosts: ["admin.toystore.com"]
+        configurations:
+          - actions:
+              - generic_key:
+                  descriptor_key: admin
+                  descriptor_value: "1"
 ```
 
-Each configuration object defines a list of actions.
-Each action may (or may not) produce a descriptor entry (descriptor list item).
-If an action cannot append a descriptor entry, no descriptor is generated for the configuration.
+* When a request for `api.toystore.com` hits the filter, the descriptors generated would be:
 
-The external rate limit service will be called when there is at least one not empty descriptor
-generated by the list of configurations.
+descriptor 1
+```
+("toystore-app", "1")
+```
+descriptor 2
+```
+("api", "1")
+```
+
+* When a request for `admin.toystore.com` hits the filter, the descriptors generated would be:
+
+descriptor 1
+```
+("toystore-app", "1")
+```
+descriptor 2
+```
+("admin", "1")
+```
+
+* When a request for `other.toystore.com` hits the filter, the descriptors generated would be:
+descriptor 1
+```
+("toystore-app", "1")
+```
