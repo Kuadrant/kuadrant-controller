@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"fmt"
 
-	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
@@ -28,6 +27,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // MetadataSource https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-enum-config-route-v3-ratelimit-action-metadata-source
+
 // +kubebuilder:validation:Enum=DYNAMIC;ROUTE_ENTRY
 type MetadataSource string
 
@@ -81,58 +81,62 @@ type ActionSpecifier struct {
 	RequestHeaders *RequestHeadersSpec `json:"request_headers,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=PREAUTH;POSTAUTH;BOTH
-type RateLimitStage string
-
-const (
-	RateLimitStagePREAUTH  RateLimitStage = "PREAUTH"
-	RateLimitStagePOSTAUTH RateLimitStage = "POSTAUTH"
-	RateLimitStageBOTH     RateLimitStage = "BOTH"
-)
-
-var RateLimitStageValue = map[RateLimitStage]int32{
-	"PREAUTH":  0,
-	"POSTAUTH": 1,
-}
-
-type RateLimit struct {
-	// Definfing phase at which rate limits will be applied.
-	// Valid values are: PREAUTH, POSTAUTH, BOTH
-	Stage RateLimitStage `json:"stage"`
-	// +optional
-	Actions []*ActionSpecifier `json:"actions,omitempty"`
-}
-
-// Each operation type has OR semantics and overall AND semantics for a match.
-type Operation struct {
-	Paths   []string `json:"paths,omitempty"`
-	Methods []string `json:"methods,omitempty"`
-}
-
+// Rule defines a single condition for the rate limit configuration
+// All defined fields within the rule must be met to have a rule match
 type Rule struct {
-	// Name supports regex for fetching operations from routing resources
-	// For VirtualService, if route name matches, all the match requests are
-	// converted to operations internally. But specific match request names
-	// are also supported.
-	Name string `json:"name,omitempty"`
-	// Operation specifies the operations of a request
 	// +optional
-	Operations []*Operation `json:"operations,omitempty"`
+	Paths []string `json:"paths,omitempty"`
 	// +optional
-	RateLimits []*RateLimit `json:"rateLimits,omitempty"`
+	Methods []string `json:"methods,omitempty"`
+	// +optional
+	Hosts []string `json:"hosts,omitempty"`
+}
+
+// Configuration represents an action configuration.
+// The equivalent of [config.route.v3.RateLimit](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-ratelimit)
+// envoy object.
+// Each action configuration produces, at most, one descriptor.
+// Depending on the incoming request, one configuration may or may not produce
+// a rate limit descriptor.
+type Configuration struct {
+	// Actions holds list of action specifiers. Each action specifier can only define one action type.
+	Actions []ActionSpecifier `json:"actions"`
+}
+
+// Limit represents partially a Limitador limit.
+type Limit struct {
+	MaxValue uint64 `json:"maxValue"`
+	Seconds  uint32 `json:"seconds"`
+	// +optional
+	Conditions []string `json:"conditions,omitempty"`
+	// +optional
+	Variables []string `json:"variables,omitempty"`
+}
+
+// RateLimit represents a complete rate limit configuration
+type RateLimit struct {
+	// Configurations holds list of (action) configuration.
+	Configurations []Configuration `json:"configurations"`
+
+	// Rules represents the definition of the scope of the rate limit object
+	// Defines a list of conditions for which rate limit configuration will apply
+	// Matching occurs when at least one rule applies against the incoming request.
+	// If rules are not set, or empty, it is equivalent to matching all the requests.
+	// +optional
+	Rules []Rule `json:"operations,omitempty"`
+
+	// Limits holds a list of Limitador limits
+	// +optional
+	Limits []Limit `json:"limits,omitempty"`
 }
 
 // RateLimitPolicySpec defines the desired state of RateLimitPolicy
 type RateLimitPolicySpec struct {
 	// TargetRef identifies an API object to apply policy to.
 	TargetRef gatewayapiv1alpha2.PolicyTargetReference `json:"targetRef"`
+	// RateLimits holds the list of rate limit configurations
 	// +optional
-	Rules []*Rule `json:"rules,omitempty"`
-	// +optional
-	RateLimits []*RateLimit `json:"rateLimits,omitempty"`
-	Domain     string       `json:"domain"`
-	// +optional
-	Limits []limitadorv1alpha1.RateLimitSpec `json:"limits,omitempty"`
+	RateLimits []RateLimit `json:"rateLimits,omitempty"`
 }
 
 // RateLimitPolicyStatus defines the observed state of RateLimitPolicy
