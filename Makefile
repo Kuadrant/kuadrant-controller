@@ -106,7 +106,7 @@ test: test-unit test-integration ## Run all tests
 test-integration: clean-cov generate fmt vet manifests envtest ## Run Integration tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" USE_EXISTING_CLUSTER=true go test ./... -coverprofile $(PROJECT_PATH)/cover.out -tags integration -ginkgo.v -ginkgo.progress -v -timeout 0
 
-test-unit: clean-cov generate fmt vet manifests ## Run Unit tests.
+test-unit: clean-cov generate fmt vet ## Run Unit tests.
 	go test ./... -coverprofile $(PROJECT_PATH)/cover.out -tags unit -v -timeout 0
 
 clean-cov:

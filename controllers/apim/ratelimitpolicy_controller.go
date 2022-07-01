@@ -149,11 +149,12 @@ func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apim
 		return ctrl.Result{}, err
 	}
 
-	err = r.reconcileNetworkResourceBackReference(ctx, rlp)
+	err = r.reconcileHTTPRouteBackReference(ctx, rlp)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
+	// First Limitador limits, then WASM plugin configs
 	if err := r.reconcileLimits(ctx, rlp); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -199,7 +200,11 @@ func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *ap
 	return nil
 }
 
-func (r *RateLimitPolicyReconciler) reconcileNetworkResourceBackReference(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
+func (r *RateLimitPolicyReconciler) reconcileHTTPRouteBackReference(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
+	if !rlp.IsForHTTPRoute() {
+		return nil
+	}
+
 	logger, _ := logr.FromContext(ctx)
 	httpRoute, err := r.fetchHTTPRoute(ctx, rlp)
 	if err != nil {
@@ -223,7 +228,7 @@ func (r *RateLimitPolicyReconciler) reconcileNetworkResourceBackReference(ctx co
 		httpRouteAnnotations[common.RateLimitPolicyBackRefAnnotation] = rlpKey.String()
 		httpRoute.SetAnnotations(httpRouteAnnotations)
 		err := r.UpdateResource(ctx, httpRoute)
-		logger.V(1).Info("reconcileNetworkResourceBackReference: update HTTPRoute", "httpRoute", client.ObjectKeyFromObject(httpRoute), "err", err)
+		logger.V(1).Info("reconcileHTTPRouteBackReference: update HTTPRoute", "httpRoute", client.ObjectKeyFromObject(httpRoute), "err", err)
 		if err != nil {
 			return err
 		}
@@ -392,6 +397,10 @@ func (r *RateLimitPolicyReconciler) gatewayRefList(httpRoute *gatewayapiv1alpha2
 }
 
 func (r *RateLimitPolicyReconciler) validateHTTPRoute(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
+	if !rlp.IsForHTTPRoute() {
+		return nil
+	}
+
 	httpRoute, err := r.fetchHTTPRoute(ctx, rlp)
 	if err != nil {
 		// The object should exist

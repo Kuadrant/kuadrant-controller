@@ -167,8 +167,8 @@ func (r *RateLimitPolicy) Validate() error {
 		return fmt.Errorf("invalid targetRef.Group %s. The only supported group is gateway.networking.k8s.io", r.Spec.TargetRef.Group)
 	}
 
-	if r.Spec.TargetRef.Kind != gatewayapiv1alpha2.Kind("HTTPRoute") {
-		return fmt.Errorf("invalid targetRef.Kind %s. The only supported kind is HTTPRoute", r.Spec.TargetRef.Kind)
+	if r.Spec.TargetRef.Kind != gatewayapiv1alpha2.Kind("HTTPRoute") && r.Spec.TargetRef.Kind != gatewayapiv1alpha2.Kind("Gateway") {
+		return fmt.Errorf("invalid targetRef.Kind %s. The only supported kind types are HTTPRoute and Gateway", r.Spec.TargetRef.Kind)
 	}
 
 	if r.Spec.TargetRef.Namespace != nil && string(*r.Spec.TargetRef.Namespace) != r.Namespace {
@@ -176,6 +176,22 @@ func (r *RateLimitPolicy) Validate() error {
 	}
 
 	return nil
+}
+
+func (r *RateLimitPolicy) IsForHTTPRoute() bool {
+	if err := r.Validate(); err != nil {
+		return false
+	}
+
+	return r.Spec.TargetRef.Kind == gatewayapiv1alpha2.Kind("HTTPRoute")
+}
+
+func (r *RateLimitPolicy) IsForGateway() bool {
+	if err := r.Validate(); err != nil {
+		return false
+	}
+
+	return r.Spec.TargetRef.Kind == gatewayapiv1alpha2.Kind("Gateway")
 }
 
 //+kubebuilder:object:root=true
