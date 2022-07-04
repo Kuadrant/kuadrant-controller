@@ -38,7 +38,7 @@ func testBuildBasicHTTPRouteRLP(name string) *RateLimitPolicy {
 	return testBuildBasicRLP(name, gatewayapiv1alpha2.Kind("HTTPRoute"))
 }
 
-// TestHelloName calls greetings.Hello with a name, checking
+// TestRateLimitPolicyValidation calls rlp.Validate()
 // for a valid return value.
 func TestRateLimitPolicyValidation(t *testing.T) {
 	// valid httproute rlp
