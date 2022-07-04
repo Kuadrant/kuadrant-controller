@@ -154,6 +154,11 @@ func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apim
 		return ctrl.Result{}, err
 	}
 
+	err = r.reconcileGatewayBackReference(ctx, rlp)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// First Limitador limits, then WASM plugin configs
 	if err := r.reconcileLimits(ctx, rlp); err != nil {
 		return ctrl.Result{}, err
@@ -229,6 +234,43 @@ func (r *RateLimitPolicyReconciler) reconcileHTTPRouteBackReference(ctx context.
 		httpRoute.SetAnnotations(httpRouteAnnotations)
 		err := r.UpdateResource(ctx, httpRoute)
 		logger.V(1).Info("reconcileHTTPRouteBackReference: update HTTPRoute", "httpRoute", client.ObjectKeyFromObject(httpRoute), "err", err)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *RateLimitPolicyReconciler) reconcileGatewayBackReference(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
+	if !rlp.IsForGateway() {
+		return nil
+	}
+
+	logger, _ := logr.FromContext(ctx)
+	gw, err := r.fetchGateway(ctx, rlp)
+	if err != nil {
+		// The object should also exist
+		return err
+	}
+
+	// Reconcile the back reference:
+	gwAnnotations := gw.GetAnnotations()
+	if gwAnnotations == nil {
+		gwAnnotations = map[string]string{}
+	}
+
+	rlpKey := client.ObjectKeyFromObject(rlp)
+	val, ok := gwAnnotations[common.RateLimitPolicyBackRefAnnotation]
+	if ok {
+		if val != rlpKey.String() {
+			return fmt.Errorf("the target Gateway {%s} is already referenced by ratelimitpolicy %s", client.ObjectKeyFromObject(gw), rlpKey.String())
+		}
+	} else {
+		gwAnnotations[common.RateLimitPolicyBackRefAnnotation] = rlpKey.String()
+		gw.SetAnnotations(gwAnnotations)
+		err := r.UpdateResource(ctx, gw)
+		logger.V(1).Info("reconcileGatewayBackReference: update Gateway", "gateway", client.ObjectKeyFromObject(gw), "err", err)
 		if err != nil {
 			return err
 		}
@@ -360,7 +402,7 @@ func (r *RateLimitPolicyReconciler) reconcileWASMPlugins(ctx context.Context, rl
 	return nil
 }
 
-func (r *RateLimitPolicyReconciler) fetchHTTPRoute(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) (*gatewayapiv1alpha2.HTTPRoute, error) {
+func (r *RateLimitPolicyReconciler) fetchGateway(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) (*gatewayapiv1alpha2.HTTPRoute, error) {
 	logger, _ := logr.FromContext(ctx)
 
 	tmpNS := rlp.Namespace
@@ -373,14 +415,14 @@ func (r *RateLimitPolicyReconciler) fetchHTTPRoute(ctx context.Context, rlp *api
 		Namespace: tmpNS,
 	}
 
-	httpRoute := &gatewayapiv1alpha2.HTTPRoute{}
-	err := r.Client().Get(ctx, key, httpRoute)
-	logger.V(1).Info("fetchHTTPRoute", "httpRoute", key, "err", err)
+	gw := &gatewayapiv1alpha2.Gateway{}
+	err := r.Client().Get(ctx, key, gw)
+	logger.V(1).Info("fetchGateway", "gateway", key, "err", err)
 	if err != nil {
 		return nil, err
 	}
 
-	return httpRoute, nil
+	return gw, nil
 }
 
 func (r *RateLimitPolicyReconciler) gatewayRefList(httpRoute *gatewayapiv1alpha2.HTTPRoute) []client.ObjectKey {
