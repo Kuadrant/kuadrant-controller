@@ -105,8 +105,8 @@ type Configuration struct {
 
 // Limit represents partially a Limitador limit.
 type Limit struct {
-	MaxValue uint64 `json:"maxValue"`
-	Seconds  uint32 `json:"seconds"`
+	MaxValue int `json:"maxValue"`
+	Seconds  int `json:"seconds"`
 	// +optional
 	Conditions []string `json:"conditions,omitempty"`
 	// +optional

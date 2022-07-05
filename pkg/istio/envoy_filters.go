@@ -47,13 +47,13 @@ func LimitadorClusterEnvoyFilter(gwKey client.ObjectKey, labels map[string]strin
 	patchUnstructured := map[string]interface{}{
 		"operation": "ADD",
 		"value": map[string]interface{}{
-			"name":                   PatchedLimitadorClusterName,
+			"name":                   "TODO!!!",
 			"type":                   "STRICT_DNS",
 			"connect_timeout":        "1s",
 			"lb_policy":              "ROUND_ROBIN",
 			"http2_protocol_options": map[string]interface{}{},
 			"load_assignment": map[string]interface{}{
-				"cluster_name": PatchedLimitadorClusterName,
+				"cluster_name": "TODO!!!",
 				"endpoints": []map[string]interface{}{
 					{
 						"lb_endpoints": []map[string]interface{}{

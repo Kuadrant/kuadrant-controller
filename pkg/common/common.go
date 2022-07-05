@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -41,6 +42,8 @@ const (
 
 var (
 	LimitadorServiceClusterHost = fmt.Sprintf("limitador.%s.svc.cluster.local", KuadrantNamespace)
+	LimitadorNamespace          = FetchEnv("LIMITADOR_NAMESPACE", KuadrantNamespace)
+	LimitadorName               = FetchEnv("LIMITADOR_NAME", "limitador")
 )
 
 func FetchEnv(key string, def string) string {
@@ -88,4 +91,26 @@ func MergeMapStringString(existing *map[string]string, desired map[string]string
 	}
 
 	return modified
+}
+
+// UnMarshallLimitNamespace parses limit namespace with format "gwNS/gwName#domain"
+func UnMarshallLimitNamespace(ns string) (client.ObjectKey, string, error) {
+	split := strings.Split(ns, "#")
+	if len(split) != 2 {
+		return client.ObjectKey{}, "", errors.New("failed to split on #")
+	}
+
+	domain := split[1]
+
+	gwSplit := strings.Split(split[0], "/")
+	if len(gwSplit) != 2 {
+		return client.ObjectKey{}, "", errors.New("failed to split on /")
+	}
+
+	return client.ObjectKey{Namespace: gwSplit[0], Name: gwSplit[1]}, domain, nil
+}
+
+// MarshallNamespace serializes limit namespace with format "gwNS/gwName#domain"
+func MarshallNamespace(gwKey client.ObjectKey, domain string) string {
+	return fmt.Sprintf("%s/%s#%s", gwKey.Namespace, gwKey.Name, domain)
 }

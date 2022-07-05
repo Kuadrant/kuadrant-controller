@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	authorinov1beta1 "github.com/kuadrant/authorino/api/v1beta1"
-	"github.com/kuadrant/limitador-operator/api/v1alpha1"
 	istiosecurityv1beta1 "istio.io/client-go/pkg/apis/security/v1beta1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -45,21 +44,6 @@ func alwaysUpdateAuthPolicy(existingObj, desiredObj client.Object) (bool, error)
 	existing.Spec.ActionDetail = desired.Spec.ActionDetail
 	existing.Spec.Rules = desired.Spec.Rules
 	existing.Spec.Selector = desired.Spec.Selector
-	existing.Annotations = desired.Annotations
-	return true, nil
-}
-
-func alwaysUpdateRateLimit(existingObj, desiredObj client.Object) (bool, error) {
-	existing, ok := existingObj.(*v1alpha1.RateLimit)
-	if !ok {
-		return false, fmt.Errorf("%T is not a *v1alpha1.RateLimit", existingObj)
-	}
-	desired, ok := desiredObj.(*v1alpha1.RateLimit)
-	if !ok {
-		return false, fmt.Errorf("%T is not a *v1alpha1.RateLimit", desiredObj)
-	}
-
-	existing.Spec = desired.Spec
 	existing.Annotations = desired.Annotations
 	return true, nil
 }
