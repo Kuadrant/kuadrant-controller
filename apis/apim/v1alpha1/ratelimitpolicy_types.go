@@ -105,12 +105,10 @@ type Configuration struct {
 
 // Limit represents partially a Limitador limit.
 type Limit struct {
-	MaxValue int `json:"maxValue"`
-	Seconds  int `json:"seconds"`
-	// +optional
-	Conditions []string `json:"conditions,omitempty"`
-	// +optional
-	Variables []string `json:"variables,omitempty"`
+	MaxValue   int      `json:"maxValue"`
+	Seconds    int      `json:"seconds"`
+	Conditions []string `json:"conditions"`
+	Variables  []string `json:"variables"`
 }
 
 // RateLimit represents a complete rate limit configuration
@@ -123,7 +121,7 @@ type RateLimit struct {
 	// Matching occurs when at least one rule applies against the incoming request.
 	// If rules are not set, or empty, it is equivalent to matching all the requests.
 	// +optional
-	Rules []Rule `json:"operations,omitempty"`
+	Rules []Rule `json:"rules,omitempty"`
 
 	// Limits holds a list of Limitador limits
 	// +optional

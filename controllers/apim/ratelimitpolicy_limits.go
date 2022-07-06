@@ -2,6 +2,7 @@ package apim
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/go-logr/logr"
 	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
@@ -62,6 +63,15 @@ func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *ap
 
 	if !originalLimitIndex.Equals(limitIdx) {
 		limitador.Spec.Limits = limitIdx.ToLimits()
+
+		if logger.V(1).Enabled() {
+			jsonData, err := json.MarshalIndent(limitador.Spec.Limits, "", "  ")
+			if err != nil {
+				return err
+			}
+			logger.V(1).Info(string(jsonData))
+		}
+
 		err := r.UpdateResource(ctx, limitador)
 		logger.V(1).Info("reconcileLimits: update limitador", "limitador", limitadorKey, "err", err)
 		if err != nil {

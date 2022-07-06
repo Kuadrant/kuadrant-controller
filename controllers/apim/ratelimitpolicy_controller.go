@@ -18,6 +18,7 @@ package apim
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -71,6 +72,14 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 		}
 		logger.Error(err, "failed to get RateLimitPolicy")
 		return ctrl.Result{}, err
+	}
+
+	if logger.V(1).Enabled() {
+		jsonData, err := json.MarshalIndent(rlp, "", "  ")
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		logger.V(1).Info(string(jsonData))
 	}
 
 	if rlp.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(rlp, rateLimitPolicyFinalizer) {
