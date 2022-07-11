@@ -185,6 +185,11 @@ func (r *RateLimitPolicyReconciler) reconcileGatewayDiffs(ctx context.Context, r
 		return err
 	}
 
+	// should be the last step, only when all the reconciliation steps succeed
+	if err := r.reconcileGatewayRLPReferences(ctx, rlp, gatewayDiffObj); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -318,6 +323,31 @@ func (r *RateLimitPolicyReconciler) reconcileGatewayBackReference(ctx context.Co
 		}
 	}
 
+	return nil
+}
+
+func (r *RateLimitPolicyReconciler) reconcileGatewayRLPReferences(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy, gwDiffObj *gatewayDiff) error {
+	logger, _ := logr.FromContext(ctx)
+
+	for _, leftGateway := range gwDiffObj.LeftGateways {
+		if leftGateway.DeleteRLP(client.ObjectKeyFromObject(rlp)) {
+			err := r.UpdateResource(ctx, leftGateway.Gateway)
+			logger.V(1).Info("reconcileGatewayRLPReferences: update gateway", "left gateway key", leftGateway.Key(), "err", err)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, newGateway := range gwDiffObj.NewGateways {
+		if newGateway.AddRLP(client.ObjectKeyFromObject(rlp)) {
+			err := r.UpdateResource(ctx, newGateway.Gateway)
+			logger.V(1).Info("reconcileGatewayRLPReferences: update gateway", "new gateway key", newGateway.Key(), "err", err)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 

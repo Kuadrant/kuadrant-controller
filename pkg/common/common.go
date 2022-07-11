@@ -33,11 +33,11 @@ const (
 
 	HTTPRouteKind = "HTTPRoute"
 
-	KuadrantManagedLabel              = "kuadrant.io/managed"
-	KuadrantAuthProviderAnnotation    = "kuadrant.io/auth-provider"
-	KuadrantRateLimitPolicyAnnotation = "kuadrant.io/ratelimitpolicy"
-	RateLimitPolicyBackRefAnnotation  = "kuadrant.io/ratelimitpolicy-backref"
-	AuthPolicyBackRefAnnotation       = "kuadrant.io/authpolicy-backref"
+	KuadrantManagedLabel                 = "kuadrant.io/managed"
+	KuadrantAuthProviderAnnotation       = "kuadrant.io/auth-provider"
+	KuadrantRateLimitPolicyRefAnnotation = "kuadrant.io/ratelimitpolicies"
+	RateLimitPolicyBackRefAnnotation     = "kuadrant.io/ratelimitpolicy-backref"
+	AuthPolicyBackRefAnnotation          = "kuadrant.io/authpolicy-backref"
 )
 
 var (

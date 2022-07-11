@@ -9,9 +9,7 @@ import (
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
 )
 
-const (
-	gatewayRLPRefAnnotation = "ratelimitpolicy.kuadrant.io/refs"
-)
+const ()
 
 func NewGateways(gwList *gatewayapiv1alpha2.GatewayList,
 	rlpKey client.ObjectKey,
@@ -81,7 +79,7 @@ func (g GatewayWrapper) RLPRefs() []client.ObjectKey {
 		gwAnnotations = map[string]string{}
 	}
 
-	val, ok := gwAnnotations[gatewayRLPRefAnnotation]
+	val, ok := gwAnnotations[common.KuadrantRateLimitPolicyRefAnnotation]
 	if !ok {
 		return make([]client.ObjectKey, 0)
 	}
@@ -106,7 +104,7 @@ func (g GatewayWrapper) ContainsRLP(rlpKey client.ObjectKey) bool {
 		gwAnnotations = map[string]string{}
 	}
 
-	val, ok := gwAnnotations[gatewayRLPRefAnnotation]
+	val, ok := gwAnnotations[common.KuadrantRateLimitPolicyRefAnnotation]
 	if !ok {
 		return false
 	}
@@ -133,14 +131,14 @@ func (g GatewayWrapper) AddRLP(rlpKey client.ObjectKey) bool {
 		gwAnnotations = map[string]string{}
 	}
 
-	val, ok := gwAnnotations[gatewayRLPRefAnnotation]
+	val, ok := gwAnnotations[common.KuadrantRateLimitPolicyRefAnnotation]
 	if !ok {
 		refs := []client.ObjectKey{rlpKey}
 		serialized, err := json.Marshal(refs)
 		if err != nil {
 			return false
 		}
-		gwAnnotations[gatewayRLPRefAnnotation] = string(serialized)
+		gwAnnotations[common.KuadrantRateLimitPolicyRefAnnotation] = string(serialized)
 		g.SetAnnotations(gwAnnotations)
 		return true
 	}
@@ -161,7 +159,7 @@ func (g GatewayWrapper) AddRLP(rlpKey client.ObjectKey) bool {
 	if err != nil {
 		return false
 	}
-	gwAnnotations[gatewayRLPRefAnnotation] = string(serialized)
+	gwAnnotations[common.KuadrantRateLimitPolicyRefAnnotation] = string(serialized)
 	g.SetAnnotations(gwAnnotations)
 	return true
 }
@@ -178,7 +176,7 @@ func (g GatewayWrapper) DeleteRLP(rlpKey client.ObjectKey) bool {
 		gwAnnotations = map[string]string{}
 	}
 
-	val, ok := gwAnnotations[gatewayRLPRefAnnotation]
+	val, ok := gwAnnotations[common.KuadrantRateLimitPolicyRefAnnotation]
 	if !ok {
 		return false
 	}
@@ -197,7 +195,7 @@ func (g GatewayWrapper) DeleteRLP(rlpKey client.ObjectKey) bool {
 		if err != nil {
 			return false
 		}
-		gwAnnotations[gatewayRLPRefAnnotation] = string(serialized)
+		gwAnnotations[common.KuadrantRateLimitPolicyRefAnnotation] = string(serialized)
 		g.SetAnnotations(gwAnnotations)
 		return true
 	}

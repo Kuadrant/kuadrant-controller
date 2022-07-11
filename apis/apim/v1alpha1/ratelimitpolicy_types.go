@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"fmt"
 
+	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
@@ -109,6 +110,33 @@ type Limit struct {
 	Seconds    int      `json:"seconds"`
 	Conditions []string `json:"conditions"`
 	Variables  []string `json:"variables"`
+}
+
+func LimitFromLimitadorRateLimit(limit *limitadorv1alpha1.RateLimit) *Limit {
+	if limit == nil {
+		return nil
+	}
+
+	rlpLimit := &Limit{
+		MaxValue:   limit.MaxValue,
+		Seconds:    limit.Seconds,
+		Conditions: nil,
+		Variables:  nil,
+	}
+
+	if limit.Conditions != nil {
+		// deep copy
+		rlpLimit.Conditions = make([]string, len(limit.Conditions))
+		copy(rlpLimit.Conditions, limit.Conditions)
+	}
+
+	if limit.Variables != nil {
+		// deep copy
+		rlpLimit.Variables = make([]string, len(limit.Variables))
+		copy(rlpLimit.Variables, limit.Variables)
+	}
+
+	return rlpLimit
 }
 
 // RateLimit represents a complete rate limit configuration

@@ -1,6 +1,7 @@
 package rlptools
 
 import (
+	"encoding/json"
 	"reflect"
 	"sort"
 	"strings"
@@ -14,6 +15,11 @@ import (
 )
 
 type LimitsByDomain map[string][]apimv1alpha1.Limit
+
+func (l LimitsByDomain) String() string {
+	jsonData, _ := json.MarshalIndent(l, "", "  ")
+	return string(jsonData)
+}
 
 type LimitList []apimv1alpha1.Limit
 
@@ -172,16 +178,7 @@ func (l *LimitIndex) AddLimitFromRateLimit(limit *limitadorv1alpha1.RateLimit) {
 		return
 	}
 
-	var tmp1 []string
-	var tmp2 []string
-	l.AddLimit(gwKey, domain, &apimv1alpha1.Limit{
-		MaxValue: limit.MaxValue,
-		Seconds:  limit.Seconds,
-		// deep copy
-		Conditions: append(tmp1, limit.Conditions...),
-		// deep copy
-		Variables: append(tmp2, limit.Variables...),
-	})
+	l.AddLimit(gwKey, domain, apimv1alpha1.LimitFromLimitadorRateLimit(limit))
 }
 
 func (l *LimitIndex) Equals(other *LimitIndex) bool {
