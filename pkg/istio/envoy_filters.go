@@ -47,7 +47,7 @@ func LimitadorClusterEnvoyFilter(gwKey client.ObjectKey, labels map[string]strin
 	patchUnstructured := map[string]interface{}{
 		"operation": "ADD",
 		"value": map[string]interface{}{
-			"name":                   "TODO!!!",
+			"name":                   common.KuadrantRateLimitClusterName,
 			"type":                   "STRICT_DNS",
 			"connect_timeout":        "1s",
 			"lb_policy":              "ROUND_ROBIN",

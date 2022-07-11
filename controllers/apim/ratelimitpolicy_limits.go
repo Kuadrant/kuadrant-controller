@@ -37,9 +37,7 @@ func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *ap
 		}
 
 		logger.V(1).Info("reconcileLimits: same gateways", "rlpRefs", sameGateway.RLPRefs())
-		if logger.V(1).Enabled() {
-			logger.V(1).Info(gwLimits.String())
-		}
+
 		// delete first to detect when limits have been deleted.
 		// For instance, gw A has 3 limits
 		// one limit has been deleted for gwA (coming from a limit deletion in one RLP)
@@ -55,10 +53,9 @@ func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *ap
 		if err != nil {
 			return err
 		}
+
 		logger.V(1).Info("reconcileLimits: new gateways", "rlpRefs", rlpRefs)
-		if logger.V(1).Enabled() {
-			logger.V(1).Info(gwLimits.String())
-		}
+
 		// The gw A had X limits from N RLPs
 		// now there there are N+1 RLPs
 		// r.gatewayLimits will compute all the limits for the given gateway with the N+1 RLPs

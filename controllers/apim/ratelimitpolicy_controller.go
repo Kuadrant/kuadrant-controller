@@ -185,6 +185,10 @@ func (r *RateLimitPolicyReconciler) reconcileGatewayDiffs(ctx context.Context, r
 		return err
 	}
 
+	if err := r.reconcileWASMPluginConf(ctx, rlp, gatewayDiffObj); err != nil {
+		return err
+	}
+
 	// should be the last step, only when all the reconciliation steps succeed
 	if err := r.reconcileGatewayRLPReferences(ctx, rlp, gatewayDiffObj); err != nil {
 		return err
