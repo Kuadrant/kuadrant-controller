@@ -61,17 +61,27 @@ func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *ap
 	// Build a new index with the original content of limitador to compare with the new limits
 	originalLimitIndex := rlptools.NewLimitadorIndex(limitador, logger)
 
-	if !originalLimitIndex.Equals(limitIdx) {
-		limitador.Spec.Limits = limitIdx.ToLimits()
-
-		if logger.V(1).Enabled() {
-			jsonData, err := json.MarshalIndent(limitador.Spec.Limits, "", "  ")
-			if err != nil {
-				return err
-			}
-			logger.V(1).Info(string(jsonData))
+	if logger.V(1).Enabled() {
+		jsonData, err := json.MarshalIndent(originalLimitIndex.ToLimits(), "", "  ")
+		if err != nil {
+			return err
 		}
+		logger.V(1).Info("reconcileLimits: original limit index")
+		logger.V(1).Info(string(jsonData))
 
+		jsonData, err = json.MarshalIndent(limitIdx.ToLimits(), "", "  ")
+		if err != nil {
+			return err
+		}
+		logger.V(1).Info("reconcileLimits: new limit index")
+		logger.V(1).Info(string(jsonData))
+	}
+
+	equalIndexes := originalLimitIndex.Equals(limitIdx)
+	logger.V(1).Info("reconcileLimits", "equal index", equalIndexes)
+
+	if !equalIndexes {
+		limitador.Spec.Limits = limitIdx.ToLimits()
 		err := r.UpdateResource(ctx, limitador)
 		logger.V(1).Info("reconcileLimits: update limitador", "limitador", limitadorKey, "err", err)
 		if err != nil {

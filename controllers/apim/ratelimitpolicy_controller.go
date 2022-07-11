@@ -219,6 +219,8 @@ type gatewayDiff struct {
 // * list of gateways to which the RLP no longer apply
 // * list of gateways to which the RLP still applies
 func (r *RateLimitPolicyReconciler) computeGatewayDiffs(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) (*gatewayDiff, error) {
+	logger, _ := logr.FromContext(ctx)
+
 	rlpGwKeys, err := r.rlpGatewayKeys(ctx, rlp)
 	if err != nil {
 		return nil, err
@@ -231,11 +233,18 @@ func (r *RateLimitPolicyReconciler) computeGatewayDiffs(ctx context.Context, rlp
 		return nil, err
 	}
 
-	return &gatewayDiff{
+	gwDiff := &gatewayDiff{
 		NewGateways:  rlptools.NewGateways(allGwList, client.ObjectKeyFromObject(rlp), rlpGwKeys),
 		SameGateways: rlptools.SameGateways(allGwList, client.ObjectKeyFromObject(rlp), rlpGwKeys),
 		LeftGateways: rlptools.LeftGateways(allGwList, client.ObjectKeyFromObject(rlp), rlpGwKeys),
-	}, nil
+	}
+
+	logger.V(1).Info("computeGatewayDiffs",
+		"#new-gw", len(gwDiff.NewGateways),
+		"#same-gw", len(gwDiff.SameGateways),
+		"#left-gw", len(gwDiff.LeftGateways))
+
+	return gwDiff, nil
 }
 
 func (r *RateLimitPolicyReconciler) reconcileHTTPRouteBackReference(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
