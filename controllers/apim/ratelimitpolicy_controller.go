@@ -83,8 +83,7 @@ func (r *RateLimitPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl
 	}
 
 	if rlp.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(rlp, rateLimitPolicyFinalizer) {
-		logger.V(1).Info("Handling removal of ratelimitpolicy object")
-		if err := r.deleteNetworkResourceBackReference(ctx, rlp); err != nil {
+		if err := r.finalizeRLP(ctx, rlp); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -145,13 +144,8 @@ func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apim
 		return ctrl.Result{}, err
 	}
 
-	err = r.reconcileHTTPRouteBackReference(ctx, rlp)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Ensure only one RLP is targeting the gateway
-	err = r.reconcileGatewayBackReference(ctx, rlp)
+	// Ensure only one RLP is targeting the Gateway/HTTPRoute
+	err = r.reconcileDirectBackReference(ctx, rlp)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -260,72 +254,50 @@ func (r *RateLimitPolicyReconciler) computeGatewayDiffs(ctx context.Context, rlp
 	return gwDiff, nil
 }
 
-func (r *RateLimitPolicyReconciler) reconcileHTTPRouteBackReference(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
-	if !rlp.IsForHTTPRoute() {
-		return nil
-	}
-
+func (r *RateLimitPolicyReconciler) reconcileDirectBackReference(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
 	logger, _ := logr.FromContext(ctx)
-	httpRoute, err := r.fetchHTTPRoute(ctx, rlp)
-	if err != nil {
-		// The object should also exist
-		return err
-	}
+	var netObj client.Object
+	var err error
 
-	// Reconcile the back reference:
-	httpRouteAnnotations := httpRoute.GetAnnotations()
-	if httpRouteAnnotations == nil {
-		httpRouteAnnotations = map[string]string{}
-	}
-
-	rlpKey := client.ObjectKeyFromObject(rlp)
-	val, ok := httpRouteAnnotations[common.RateLimitPolicyBackRefAnnotation]
-	if ok {
-		if val != rlpKey.String() {
-			return fmt.Errorf("the target HTTPRoute {%s} is already referenced by ratelimitpolicy %s", client.ObjectKeyFromObject(httpRoute), rlpKey.String())
-		}
-	} else {
-		httpRouteAnnotations[common.RateLimitPolicyBackRefAnnotation] = rlpKey.String()
-		httpRoute.SetAnnotations(httpRouteAnnotations)
-		err := r.UpdateResource(ctx, httpRoute)
-		logger.V(1).Info("reconcileHTTPRouteBackReference: update HTTPRoute", "httpRoute", client.ObjectKeyFromObject(httpRoute), "err", err)
+	if rlp.IsForGateway() {
+		netObj, err = r.fetchGateway(ctx, rlp)
 		if err != nil {
+			// The object should also exist
 			return err
 		}
-	}
-
-	return nil
-}
-
-func (r *RateLimitPolicyReconciler) reconcileGatewayBackReference(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
-	if !rlp.IsForGateway() {
+	} else if rlp.IsForHTTPRoute() {
+		netObj, err = r.fetchHTTPRoute(ctx, rlp)
+		if err != nil {
+			// The object should also exist
+			return err
+		}
+	} else {
+		logger.Info("reconcileDirectBackReference: rlp targeting unknown network resource")
 		return nil
 	}
 
-	logger, _ := logr.FromContext(ctx)
-	gw, err := r.fetchGateway(ctx, rlp)
-	if err != nil {
-		// The object should also exist
-		return err
-	}
+	netObjKey := client.ObjectKeyFromObject(netObj)
+	netObjType := netObj.GetObjectKind().GroupVersionKind()
 
 	// Reconcile the back reference:
-	gwAnnotations := gw.GetAnnotations()
-	if gwAnnotations == nil {
-		gwAnnotations = map[string]string{}
+	objAnnotations := netObj.GetAnnotations()
+	if objAnnotations == nil {
+		objAnnotations = map[string]string{}
 	}
 
 	rlpKey := client.ObjectKeyFromObject(rlp)
-	val, ok := gwAnnotations[common.RateLimitPolicyBackRefAnnotation]
+	val, ok := objAnnotations[common.RateLimitPolicyBackRefAnnotation]
 	if ok {
 		if val != rlpKey.String() {
-			return fmt.Errorf("the target Gateway {%s} is already referenced by ratelimitpolicy %s", client.ObjectKeyFromObject(gw), rlpKey.String())
+			return fmt.Errorf("the %s target %s is already referenced by ratelimitpolicy %s",
+				netObjType, netObjKey, rlpKey.String())
 		}
 	} else {
-		gwAnnotations[common.RateLimitPolicyBackRefAnnotation] = rlpKey.String()
-		gw.SetAnnotations(gwAnnotations)
-		err := r.UpdateResource(ctx, gw)
-		logger.V(1).Info("reconcileGatewayBackReference: update Gateway", "gateway", client.ObjectKeyFromObject(gw), "err", err)
+		objAnnotations[common.RateLimitPolicyBackRefAnnotation] = rlpKey.String()
+		netObj.SetAnnotations(objAnnotations)
+		err := r.UpdateResource(ctx, netObj)
+		logger.V(1).Info("reconcileDirectBackReference: update network resource",
+			"type", netObjType, "name", netObjKey, "err", err)
 		if err != nil {
 			return err
 		}
@@ -362,15 +334,7 @@ func (r *RateLimitPolicyReconciler) reconcileGatewayRLPReferences(ctx context.Co
 func (r *RateLimitPolicyReconciler) fetchHTTPRoute(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) (*gatewayapiv1alpha2.HTTPRoute, error) {
 	logger, _ := logr.FromContext(ctx)
 
-	tmpNS := rlp.Namespace
-	if rlp.Spec.TargetRef.Namespace != nil {
-		tmpNS = string(*rlp.Spec.TargetRef.Namespace)
-	}
-
-	key := client.ObjectKey{
-		Name:      string(rlp.Spec.TargetRef.Name),
-		Namespace: tmpNS,
-	}
+	key := rlp.TargetKey()
 
 	httpRoute := &gatewayapiv1alpha2.HTTPRoute{}
 	err := r.Client().Get(ctx, key, httpRoute)
@@ -385,15 +349,7 @@ func (r *RateLimitPolicyReconciler) fetchHTTPRoute(ctx context.Context, rlp *api
 func (r *RateLimitPolicyReconciler) fetchGateway(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) (*gatewayapiv1alpha2.Gateway, error) {
 	logger, _ := logr.FromContext(ctx)
 
-	tmpNS := rlp.Namespace
-	if rlp.Spec.TargetRef.Namespace != nil {
-		tmpNS = string(*rlp.Spec.TargetRef.Namespace)
-	}
-
-	key := client.ObjectKey{
-		Name:      string(rlp.Spec.TargetRef.Name),
-		Namespace: tmpNS,
-	}
+	key := rlp.TargetKey()
 
 	gw := &gatewayapiv1alpha2.Gateway{}
 	err := r.Client().Get(ctx, key, gw)

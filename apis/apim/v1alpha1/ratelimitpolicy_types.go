@@ -21,6 +21,7 @@ import (
 
 	limitadorv1alpha1 "github.com/kuadrant/limitador-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayapiv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
@@ -222,6 +223,18 @@ func (r *RateLimitPolicy) IsForGateway() bool {
 	}
 
 	return r.Spec.TargetRef.Kind == gatewayapiv1alpha2.Kind("Gateway")
+}
+
+func (r *RateLimitPolicy) TargetKey() client.ObjectKey {
+	tmpNS := r.Namespace
+	if r.Spec.TargetRef.Namespace != nil {
+		tmpNS = string(*r.Spec.TargetRef.Namespace)
+	}
+
+	return client.ObjectKey{
+		Name:      string(r.Spec.TargetRef.Name),
+		Namespace: tmpNS,
+	}
 }
 
 //+kubebuilder:object:root=true
