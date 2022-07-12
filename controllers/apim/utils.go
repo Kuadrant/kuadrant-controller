@@ -12,11 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// limitadorRatelimitsName returns the name of Limitador RateLimit CR.
-func limitadorRatelimitsName(objKey client.ObjectKey, idx int) string {
-	return fmt.Sprintf("rlp-%s-%s-%d", objKey.Namespace, objKey.Name, idx)
-}
-
 // authConfigName returns the name of Authorino AuthConfig CR.
 func authConfigName(objKey client.ObjectKey) string {
 	return fmt.Sprintf("ap-%s-%s", objKey.Namespace, objKey.Name)

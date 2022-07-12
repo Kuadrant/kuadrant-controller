@@ -185,6 +185,10 @@ func (r *RateLimitPolicyReconciler) reconcileGatewayDiffs(ctx context.Context, r
 		return err
 	}
 
+	if err := r.reconcileRateLimitingClusterEnvoyFilter(ctx, rlp, gatewayDiffObj); err != nil {
+		return err
+	}
+
 	if err := r.reconcileWASMPluginConf(ctx, rlp, gatewayDiffObj); err != nil {
 		return err
 	}

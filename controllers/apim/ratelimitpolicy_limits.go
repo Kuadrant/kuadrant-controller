@@ -9,13 +9,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
-	"github.com/kuadrant/kuadrant-controller/pkg/common"
 	"github.com/kuadrant/kuadrant-controller/pkg/rlptools"
 )
 
 func (r *RateLimitPolicyReconciler) reconcileLimits(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy, gwDiffObj *gatewayDiff) error {
 	logger, _ := logr.FromContext(ctx)
-	limitadorKey := client.ObjectKey{Name: common.LimitadorName, Namespace: common.LimitadorNamespace}
+	limitadorKey := client.ObjectKey{Name: rlptools.LimitadorName, Namespace: rlptools.LimitadorNamespace}
 	limitador := &limitadorv1alpha1.Limitador{}
 	err := r.Client().Get(ctx, limitadorKey, limitador)
 	logger.V(1).Info("reconcileLimits", "get limitador", limitadorKey, "err", err)

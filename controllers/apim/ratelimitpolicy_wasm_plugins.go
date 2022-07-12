@@ -75,17 +75,7 @@ func (r *RateLimitPolicyReconciler) gatewayWASMPlugin(ctx context.Context, gw *g
 	logger, _ := logr.FromContext(ctx)
 	logger.V(1).Info("gatewayWASMPlugin", "gwKey", client.ObjectKeyFromObject(gw), "rlpRefs", rlpRefs)
 
-	pluginConfig, err := r.wasmPluginConfig(ctx, gw, rlpRefs)
-	if err != nil {
-		return nil, err
-	}
-
-	pluginConfigStruct, err := pluginConfig.ToStruct()
-	if err != nil {
-		return nil, err
-	}
-
-	return &istioclientgoextensionv1alpha1.WasmPlugin{
+	wasmPlugin := &istioclientgoextensionv1alpha1.WasmPlugin{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "WasmPlugin",
 			APIVersion: "extensions.istio.io/v1alpha1",
@@ -98,14 +88,34 @@ func (r *RateLimitPolicyReconciler) gatewayWASMPlugin(ctx context.Context, gw *g
 			Selector: &istiotypev1beta1.WorkloadSelector{
 				MatchLabels: gw.Labels,
 			},
-			Url:          common.WASMFilterImageURL,
-			PluginConfig: pluginConfigStruct,
+			Url:          rlptools.WASMFilterImageURL,
+			PluginConfig: nil,
 			// Insert plugin before Istio stats filters and after Istio authorization filters.
 			Phase: istioextensionsv1alpha1.PluginPhase_STATS,
 		},
-	}, nil
+	}
+
+	pluginConfig, err := r.wasmPluginConfig(ctx, gw, rlpRefs)
+	if err != nil {
+		return nil, err
+	}
+
+	if pluginConfig == nil {
+		common.TagObjectToDelete(wasmPlugin)
+		return wasmPlugin, nil
+	}
+
+	pluginConfigStruct, err := pluginConfig.ToStruct()
+	if err != nil {
+		return nil, err
+	}
+
+	wasmPlugin.Spec.PluginConfig = pluginConfigStruct
+
+	return wasmPlugin, nil
 }
 
+// returns nil when there is no rate limit policy to apply
 func (r *RateLimitPolicyReconciler) wasmPluginConfig(ctx context.Context, gw *gatewayapiv1alpha2.Gateway, rlpRefs []client.ObjectKey) (*rlptools.WASMPlugin, error) {
 	logger, _ := logr.FromContext(ctx)
 	gwKey := client.ObjectKeyFromObject(gw)
@@ -127,6 +137,11 @@ func (r *RateLimitPolicyReconciler) wasmPluginConfig(ctx context.Context, gw *ga
 		}
 	}
 
+	if len(routeRLPList) < 1 {
+		// not
+		return nil, nil
+	}
+
 	gatewayActions := rlptools.GatewayActionsByDomain{}
 
 	// iterate over HTTPRoute RLP's.
@@ -144,7 +159,6 @@ func (r *RateLimitPolicyReconciler) wasmPluginConfig(ctx context.Context, gw *ga
 		for _, hostname := range httpRoute.Spec.Hostnames {
 			gatewayActions[string(hostname)] = append(gatewayActions[string(hostname)], mergedGatewayActions...)
 		}
-
 	}
 
 	wasmPlugin := &rlptools.WASMPlugin{

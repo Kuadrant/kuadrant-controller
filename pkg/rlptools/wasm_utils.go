@@ -11,6 +11,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
+	"github.com/kuadrant/kuadrant-controller/pkg/common"
+)
+
+var (
+	WASMFilterImageURL = common.FetchEnv("WASM_FILTER_IMAGE", "oci://quay.io/kuadrant/wasm-shim:latest")
 )
 
 type GatewayAction struct {

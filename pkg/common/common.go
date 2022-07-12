@@ -27,25 +27,16 @@ import (
 
 //TODO: move the const to a proper place, or get it from config
 const (
-	KuadrantNamespace             = "kuadrant-system"
-	KuadrantAuthorizationProvider = "kuadrant-authorization"
-	KuadrantRateLimitClusterName  = "kuadrant-rate-limiting-service"
-	LimitadorServiceGrpcPort      = 8081
-
-	HTTPRouteKind = "HTTPRoute"
-
+	KuadrantNamespace                    = "kuadrant-system"
+	KuadrantAuthorizationProvider        = "kuadrant-authorization"
+	KuadrantRateLimitClusterName         = "kuadrant-rate-limiting-service"
+	LimitadorServiceGrpcPort             = 8081
+	HTTPRouteKind                        = "HTTPRoute"
 	KuadrantManagedLabel                 = "kuadrant.io/managed"
 	KuadrantAuthProviderAnnotation       = "kuadrant.io/auth-provider"
 	KuadrantRateLimitPolicyRefAnnotation = "kuadrant.io/ratelimitpolicies"
 	RateLimitPolicyBackRefAnnotation     = "kuadrant.io/ratelimitpolicy-direct-backref"
 	AuthPolicyBackRefAnnotation          = "kuadrant.io/authpolicy-backref"
-)
-
-var (
-	LimitadorServiceClusterHost = fmt.Sprintf("limitador.%s.svc.cluster.local", KuadrantNamespace)
-	LimitadorNamespace          = FetchEnv("LIMITADOR_NAMESPACE", KuadrantNamespace)
-	LimitadorName               = FetchEnv("LIMITADOR_NAME", "limitador")
-	WASMFilterImageURL          = FetchEnv("WASM_FILTER_IMAGE", "oci://quay.io/kuadrant/wasm-shim:latest")
 )
 
 func FetchEnv(key string, def string) string {
