@@ -66,14 +66,12 @@ func (r *RateLimitPolicyReconciler) reconcileRateLimitingClusterEnvoyFilter(ctx 
 func (r *RateLimitPolicyReconciler) gatewayRateLimitingClusterEnvoyFilter(
 	ctx context.Context, gw *gatewayapiv1alpha2.Gateway,
 	rlpRefs []client.ObjectKey) (*istioclientnetworkingv1alpha3.EnvoyFilter, error) {
-
 	logger, _ := logr.FromContext(ctx)
 	gwKey := client.ObjectKeyFromObject(gw)
 	logger.V(1).Info("gatewayRateLimitingClusterEnvoyFilter", "gwKey", gwKey, "rlpRefs", rlpRefs)
 
 	// Load all relevant rate limit policies
 	routeRLPList := make([]*apimv1alpha1.RateLimitPolicy, 0)
-	gwRLPList := make([]*apimv1alpha1.RateLimitPolicy, 0)
 	for _, rlpKey := range rlpRefs {
 		rlp := &apimv1alpha1.RateLimitPolicy{}
 		err := r.Client().Get(ctx, rlpKey, rlp)
@@ -84,8 +82,6 @@ func (r *RateLimitPolicyReconciler) gatewayRateLimitingClusterEnvoyFilter(
 
 		if rlp.IsForHTTPRoute() {
 			routeRLPList = append(routeRLPList, rlp)
-		} else if rlp.IsForGateway() {
-			gwRLPList = append(gwRLPList, rlp)
 		}
 	}
 

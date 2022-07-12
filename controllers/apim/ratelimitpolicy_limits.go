@@ -136,7 +136,6 @@ func (r *RateLimitPolicyReconciler) gatewayLimits(ctx context.Context, rlpRefs [
 		for _, hostname := range httpRoute.Spec.Hostnames {
 			limits[string(hostname)] = append(limits[string(hostname)], mergedLimits...)
 		}
-
 	}
 
 	return limits, nil

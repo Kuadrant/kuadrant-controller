@@ -179,7 +179,6 @@ func (r *RateLimitPolicyReconciler) wasmPluginConfig(ctx context.Context, gw *ga
 	}
 
 	return wasmPlugin, nil
-
 }
 
 // merge operations currently implemented with list append operation

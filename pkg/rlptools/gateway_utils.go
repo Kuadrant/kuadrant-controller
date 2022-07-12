@@ -9,12 +9,9 @@ import (
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
 )
 
-const ()
-
 func NewGateways(gwList *gatewayapiv1alpha2.GatewayList,
 	rlpKey client.ObjectKey,
 	rlpGwKeys []client.ObjectKey) []GatewayWrapper {
-
 	// gateways referenced by the rlp but do not have reference to it in the annotations
 	newGateways := make([]GatewayWrapper, 0)
 	for idx := range gwList.Items {
@@ -29,7 +26,6 @@ func NewGateways(gwList *gatewayapiv1alpha2.GatewayList,
 func SameGateways(gwList *gatewayapiv1alpha2.GatewayList,
 	rlpKey client.ObjectKey,
 	rlpGwKeys []client.ObjectKey) []GatewayWrapper {
-
 	// gateways referenced by the rlp but also have reference to it in the annotations
 	sameGateways := make([]GatewayWrapper, 0)
 	for idx := range gwList.Items {
@@ -45,7 +41,6 @@ func SameGateways(gwList *gatewayapiv1alpha2.GatewayList,
 func LeftGateways(gwList *gatewayapiv1alpha2.GatewayList,
 	rlpKey client.ObjectKey,
 	rlpGwKeys []client.ObjectKey) []GatewayWrapper {
-
 	// gateways not referenced by the rlp but still have reference in the annotations
 	leftGateways := make([]GatewayWrapper, 0)
 	for idx := range gwList.Items {
