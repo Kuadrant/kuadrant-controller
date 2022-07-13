@@ -164,7 +164,7 @@ func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Contex
 				}
 			}
 			if !isSubsetHost {
-				return fmt.Errorf("rule #%d host '%s' doesn't follow any hierarchical constraints", ruleIdx+1, host)
+				return fmt.Errorf("rule #%d host (%s) does not follow any hierarchical constraints", ruleIdx+1, host)
 			}
 		}
 	}
@@ -178,7 +178,7 @@ func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Contex
 			}
 		}
 		if !isSubsetHost {
-			return fmt.Errorf("host defined in hostnames '%s' doesn't follow any hierarchical constraints", host)
+			return fmt.Errorf("host defined in authscheme (%s) does not follow any hierarchical constraints", host)
 		}
 	}
 	return nil
@@ -202,12 +202,6 @@ func (r *AuthPolicyReconciler) reconcileAuthSchemes(ctx context.Context, ap *api
 	}
 
 	return nil
-}
-
-func PrefixHostsConstraint(obj client.Object) []string {
-
-	// obj is a gateway resource with no prefix constraint
-	return []string{""}
 }
 
 // reconcileAuthRules translates and reconciles `AuthRules` into an Istio AuthorizationPoilcy containing them.
