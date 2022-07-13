@@ -135,6 +135,7 @@ func (r *AuthPolicyReconciler) reconcileSpec(ctx context.Context, ap *apimv1alph
 }
 
 func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
+	logger, _ := logr.FromContext(ctx)
 	targetObj, err := r.fetchTargetObject(ctx, ap)
 	if err != nil {
 		return err
@@ -146,7 +147,7 @@ func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Contex
 		for idx := range hostnames {
 			if len(hostnames[idx]) != 0 && hostnames[idx][0] == '*' {
 				// Follows https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1alpha2.Hostname
-				trimmedHost := strings.Trim(hostnames[idx], "*.")
+				trimmedHost := strings.Trim(hostnames[idx], "*")
 				constrainingHosts = append(constrainingHosts, trimmedHost)
 			} else {
 				constrainingHosts = append(constrainingHosts, hostnames[idx])
@@ -154,9 +155,11 @@ func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Contex
 		}
 	}
 
+	logger.V(1).Info("constraining hostnames", "hostnames", constrainingHosts)
+
 	for ruleIdx, rule := range ap.Spec.AuthRules {
 		for _, host := range rule.Hosts {
-			isSubsetHost := false
+			isSubsetHost := len(constrainingHosts) == 0 // When target object is Gateway, constraining hosts are zero.
 			for _, constraint := range constrainingHosts {
 				if strings.HasSuffix(host, constraint) {
 					isSubsetHost = true
@@ -170,7 +173,7 @@ func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Contex
 	}
 
 	for _, host := range ap.Spec.AuthScheme.Hosts {
-		isSubsetHost := false
+		isSubsetHost := len(constrainingHosts) == 0
 		for _, constraint := range constrainingHosts {
 			if strings.HasSuffix(host, constraint) {
 				isSubsetHost = true
