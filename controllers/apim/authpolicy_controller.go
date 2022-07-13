@@ -3,6 +3,7 @@ package apim
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	authorinov1beta1 "github.com/kuadrant/authorino/api/v1beta1"
@@ -114,6 +115,10 @@ func (r *AuthPolicyReconciler) reconcileSpec(ctx context.Context, ap *apimv1alph
 		return ctrl.Result{}, err
 	}
 
+	if err := r.enforceHierarchicalConstraints(ctx, ap); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if err := r.reconcileNetworkResourceBackReference(ctx, ap); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -127,6 +132,56 @@ func (r *AuthPolicyReconciler) reconcileSpec(ctx context.Context, ap *apimv1alph
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
+	targetObj, err := r.fetchTargetObject(ctx, ap)
+	if err != nil {
+		return err
+	}
+
+	constrainingHosts := []string{}
+	if hr, isHR := targetObj.(*gatewayapiv1alpha2.HTTPRoute); isHR {
+		hostnames := HostnamesToStrings(hr.Spec.Hostnames)
+		for idx := range hostnames {
+			if len(hostnames[idx]) != 0 && hostnames[idx][0] == '*' {
+				// Follows https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1alpha2.Hostname
+				trimmedHost := strings.Trim(hostnames[idx], "*.")
+				constrainingHosts = append(constrainingHosts, trimmedHost)
+			} else {
+				constrainingHosts = append(constrainingHosts, hostnames[idx])
+			}
+		}
+	}
+
+	for ruleIdx, rule := range ap.Spec.AuthRules {
+		for _, host := range rule.Hosts {
+			isSubsetHost := false
+			for _, constraint := range constrainingHosts {
+				if strings.HasSuffix(host, constraint) {
+					isSubsetHost = true
+					break
+				}
+			}
+			if !isSubsetHost {
+				return fmt.Errorf("rule #%d host '%s' doesn't follow any hierarchical constraints", ruleIdx+1, host)
+			}
+		}
+	}
+
+	for _, host := range ap.Spec.AuthScheme.Hosts {
+		isSubsetHost := false
+		for _, constraint := range constrainingHosts {
+			if strings.HasSuffix(host, constraint) {
+				isSubsetHost = true
+				break
+			}
+		}
+		if !isSubsetHost {
+			return fmt.Errorf("host defined in hostnames '%s' doesn't follow any hierarchical constraints", host)
+		}
+	}
+	return nil
 }
 
 func (r *AuthPolicyReconciler) reconcileAuthSchemes(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
@@ -147,6 +202,12 @@ func (r *AuthPolicyReconciler) reconcileAuthSchemes(ctx context.Context, ap *api
 	}
 
 	return nil
+}
+
+func PrefixHostsConstraint(obj client.Object) []string {
+
+	// obj is a gateway resource with no prefix constraint
+	return []string{""}
 }
 
 // reconcileAuthRules translates and reconciles `AuthRules` into an Istio AuthorizationPoilcy containing them.
