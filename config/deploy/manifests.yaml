@@ -1769,10 +1769,15 @@ spec:
                                         path:
                                           items:
                                             properties:
-                                              key:
-                                                type: string
+                                              segment:
+                                                properties:
+                                                  key:
+                                                    type: string
+                                                required:
+                                                - key
+                                                type: object
                                             required:
-                                            - key
+                                            - segment
                                             type: object
                                           type: array
                                       required:
@@ -1780,6 +1785,7 @@ spec:
                                       - path
                                       type: object
                                     source:
+                                      default: DYNAMIC
                                       enum:
                                       - DYNAMIC
                                       - ROUTE_ENTRY
