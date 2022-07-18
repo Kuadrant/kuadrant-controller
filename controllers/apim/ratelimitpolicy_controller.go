@@ -53,6 +53,8 @@ type RateLimitPolicyReconciler struct {
 //+kubebuilder:rbac:groups=networking.istio.io,resources=gateways,verbs=get;list;watch
 //+kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;delete;update;patch
 //+kubebuilder:rbac:groups=limitador.kuadrant.io,resources=ratelimits,verbs=get;list;watch;create;update;delete;patch
+//+kubebuilder:rbac:groups=limitador.kuadrant.io,resources=limitadors,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=limitador.kuadrant.io,resources=limitadors/status,verbs=get;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -301,6 +303,13 @@ func (r *RateLimitPolicyReconciler) reconcileWASMEnvoyFilters(ctx context.Contex
 		logger.V(1).Info("reconcileWASMEnvoyFilters: get Gateway", "gateway", gwKey, "err", err)
 		if err != nil {
 			// gateway needs to exist
+			return err
+		}
+
+		// Get Limitador service endpoint from Limitador CR Status
+		limitadorNamespacedName := client.ObjectKey{Name: common.LimitadorName, Namespace: common.LimitadorNamespace}
+		limitadorCR := &v1alpha1.Limitador{}
+		if err := r.Client().Get(ctx, limitadorNamespacedName, limitadorCR); err != nil {
 			return err
 		}
 

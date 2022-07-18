@@ -41,9 +41,9 @@ const (
 
 var (
 	LimitadorNamespace          = FetchEnv("LIMITADOR_NAMESPACE", "kuadrant-system")
-	LimitadorServiceName        = FetchEnv("LIMITADOR_SERVICE_NAME", "limitador")
+	LimitadorName               = FetchEnv("LIMITADOR_SERVICE_NAME", "limitador")
 	LimitadorServiceGrpcPort    = FetchEnv("LIMITADOR_SERVICE_GRPC_PORT", "8081")
-	LimitadorServiceClusterHost = fmt.Sprintf("%s.%s.svc.cluster.local", LimitadorServiceName, LimitadorNamespace)
+	LimitadorServiceClusterHost = fmt.Sprintf("%s.%s.svc.cluster.local", LimitadorName, LimitadorNamespace)
 )
 
 func FetchEnv(key string, def string) string {
