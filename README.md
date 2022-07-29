@@ -105,7 +105,7 @@ Your service is being rate limited according to the policy you defined.
 
 Your gateway is being rate limited according to the policy you defined.
 
-## User guide index
+## User guides
 
 The user guides section of the docs gathers several use-cases as well as the instructions to implement them using kuadrant.
 
