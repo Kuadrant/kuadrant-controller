@@ -93,7 +93,7 @@ for installation.
 * Expose the service/API using the kubernetes Gateway API, ie
 [HTTPRoute](https://gateway-api.sigs.k8s.io/v1alpha2/references/spec/#gateway.networking.k8s.io/v1alpha2.HTTPRoute) object.
 * Write and apply the Kuadrant's [RateLimitPolicy](/doc/rate-limiting.md) and/or
-[AuthPolicy CRD](apis/apim/v1alpha1/authpolicy_types.go) resources targeting the HTTPRoute resource
+[AuthPolicy](apis/apim/v1alpha1/authpolicy_types.go) custom resources targeting the HTTPRoute resource
 to have your API protected.
 
 ### If you are a *Cluster Operator*
