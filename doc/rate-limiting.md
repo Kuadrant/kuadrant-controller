@@ -290,8 +290,40 @@ spec:
 ### The WASM Filter
 
 On designing kuadrant rate limiting and considering Istio/Envoy's rate limiting offering,
-we hit two limitations
-([described here](https://docs.google.com/document/d/1ve_8ZBq8TK_wnAZHg69M6-f_q1w-mX4vuP1BC1EuEO8/edit#bookmark=id.5wyq2fj56u94)).
+we hit two limitations.
+
+* *Shared Rate Limiting Domain*: The rate limiting
+[domain](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/ratelimit/v3/rate_limit.proto#envoy-v3-api-msg-extensions-filters-http-ratelimit-v3-ratelimit)
+used in the global rate limiting filter in Envoy are shared across the Ingress Gateway.
+This is because Istio creates only one filter chain by default at the listener level.
+This means the rate limiting filter configuration is shared at the gateway level
+(which rate limiting service to call, which domain to use). The triggering of actual rate limiting
+calls happens at the
+[virtual host / route level by adding actions and descriptors](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/rate_limit_filter#rate-limit).
+This need to have shared domains causes several issues:
+  * All rate limit configurations applied to limitador need to use a shared domain or set of
+  shared domains (when using stages). This means that for each rate limiting request,
+  limitador will need to iterate through each of the rate limit resources within the shared domain
+  and evaluate each of their conditions to find which one applies. As the number of APIs increases
+  so would the number of resources that limitador would need to evaluate.
+  * With a shared domain comes the risk of a clash. To avoid a potential clash, either the user or
+  Kuadrant controller would need to inject a globally unique condition into each rate limit
+  resource.
+* *Limited ability to invoke rate limiting based on the method or path*: Although Envoy supports
+applying rate limits at both the virtual host and also the route level, via Istio this currently
+only works if you are using a VirtualService. This is because the EnvoyFilter needed to configure
+rate limiting needs a
+[named route](https://istio.io/latest/docs/reference/config/networking/envoy-filter/#EnvoyFilter-RouteConfigurationMatch-RouteMatch)
+in order to match and apply a change to a specific route. This means for non VirtualService routing
+(IE HTTPRoute) path, header and method conditional rules must all be applied in Limitador directly
+which naturally creates additional load on Limitador, latency for endpoints that don’t need/want
+rate limiting and the descriptors needed to apply rate limiting rules must all be defined at the
+host level rather than based on the path / method. Issues capturing this limitation are linked
+below:
+  * https://github.com/istio/istio/issues/36790
+  * https://github.com/istio/istio/issues/37346
+  * https://github.com/kubernetes-sigs/gateway-api/pull/996
+
 Therefore, not giving up entirely in existing
 [Envoy's RateLimit Filter](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/network/ratelimit/v3/rate_limit.proto#extension-envoy-filters-network-ratelimit),
 we decided to move on and leverage the Envoy's
