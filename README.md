@@ -102,7 +102,7 @@ to have your API protected.
 [Gateway](https://gateway-api.sigs.k8s.io/v1alpha2/references/spec/#gateway.networking.k8s.io/v1alpha2.Gateway) resource.
 * Write and apply the Kuadrant's RateLimitPolicy custom resource targeting the Gateway resource.
 * Write and apply the Kuadrant's [RateLimitPolicy](/doc/rate-limiting.md) and/or
-[AuthPolicy CRD](apis/apim/v1alpha1/authpolicy_types.go) resources targeting the Gateway resource
+[AuthPolicy](apis/apim/v1alpha1/authpolicy_types.go) custom resources targeting the Gateway resource
 to have your gateway traffic protected.
 
 ## User guides
