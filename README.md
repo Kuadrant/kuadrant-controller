@@ -50,7 +50,7 @@ to operate the cluster (istio's) ingress gateway to provide API management with 
 | --- | --- |
 | Control Plane | The control plane takes the customer desired configuration (declaratively as kubernetes custom resources) as input and ensures all components are configured to obey customer's desired behavior.<br> This repository contains the source code of the kuadrant control plane |
 | [Kuadrant Operator](https://github.com/Kuadrant/kuadrant-operator) | A Kubernetes Operator to manage the lifecycle of the kuadrant deployment |
-| [Authorino](https://github.com/Kuadrant/authorino) | The AuthN/AuthZ enforcer. As the [external istio authorizer](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/) ([envoy external authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) serving [gRPC](https://grpc.io/) service) |
+| [Authorino](https://github.com/Kuadrant/authorino) | The AuthN/AuthZ enforcer. As the [external istio authorizer](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/) ([envoy external authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) serving gRPC service) |
 | [Limitador](https://github.com/Kuadrant/limitador) | The external rate limiting service. It exposes a gRPC service implementing the [Envoy Rate Limit protocol (v3)](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ratelimit/v3/rls.proto) |
 | [Authorino Operator](https://github.com/Kuadrant/authorino-operator) | A Kubernetes Operator to manage Authorino instances |
 | [Limitador Operator](https://github.com/Kuadrant/limitador-operator) | A Kubernetes Operator to manage Limitador instances |
