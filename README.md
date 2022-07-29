@@ -14,14 +14,13 @@
       * [Pre-requisites](#pre-requisites)
       * [If you are an <em>API Provider</em>](#if-you-are-an-api-provider)
       * [If you are a <em>Cluster Operator</em>](#if-you-are-a-cluster-operator)
-   * [User guide index](#user-guide-index)
+   * [User guides](#user-guides)
    * [<a href="/doc/rate-limiting.md">Kuadrant Rate Limiting</a>](#kuadrant-rate-limiting)
-   * [FAQ](#faq)
    * [Contributing](#contributing)
    * [Licensing](#licensing)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
-<!-- Added by: eguzki, at: jue 28 jul 2022 21:15:27 CEST -->
+<!-- Added by: eguzki, at: vie 29 jul 2022 14:46:51 CEST -->
 
 <!--te-->
 
@@ -93,17 +92,18 @@ for installation.
 * Deploy the service/API to be protected ("Upstream")
 * Expose the service/API using the kubernetes Gateway API, ie
 [HTTPRoute](https://gateway-api.sigs.k8s.io/v1alpha2/references/spec/#gateway.networking.k8s.io/v1alpha2.HTTPRoute) object.
-* Write and apply the Kuadrant's RateLimitPolicy custom resource targeting the HTTPRoute resource.
-
-Your service is being rate limited according to the policy you defined.
+* Write and apply the Kuadrant's [RateLimitPolicy](/doc/rate-limiting.md) and/or
+[AuthPolicy CRD](apis/apim/v1alpha1/authpolicy_types.go) resources targeting the HTTPRoute resource
+to have your API protected.
 
 ### If you are a *Cluster Operator*
 
 * (Optionally) deploy istio ingress gateway using the
 [Gateway](https://gateway-api.sigs.k8s.io/v1alpha2/references/spec/#gateway.networking.k8s.io/v1alpha2.Gateway) resource.
 * Write and apply the Kuadrant's RateLimitPolicy custom resource targeting the Gateway resource.
-
-Your gateway is being rate limited according to the policy you defined.
+* Write and apply the Kuadrant's [RateLimitPolicy](/doc/rate-limiting.md) and/or
+[AuthPolicy CRD](apis/apim/v1alpha1/authpolicy_types.go) resources targeting the Gateway resource
+to have your gateway traffic protected.
 
 ## User guides
 
@@ -114,8 +114,6 @@ The user guides section of the docs gathers several use-cases as well as the ins
 * [Gateway rate limiting for cluster operators](doc/user-guides/gateway-rl-for-cluster-operators.md)
 
 ## [Kuadrant Rate Limiting](/doc/rate-limiting.md)
-
-## FAQ
 
 ## Contributing
 
