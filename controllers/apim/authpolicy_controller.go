@@ -22,6 +22,7 @@ import (
 
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
+	"github.com/kuadrant/kuadrant-controller/pkg/index"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 	"github.com/kuadrant/kuadrant-controller/pkg/rlptools"
 )
@@ -30,6 +31,7 @@ import (
 type AuthPolicyReconciler struct {
 	*reconcilers.BaseReconciler
 	Scheme *runtime.Scheme
+	Index  *index.IndexTree
 }
 
 const authPolicyFinalizer = "authpolicy.kuadrant.io/finalizer"
@@ -57,6 +59,7 @@ func (r *AuthPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	// TODO: if deletion happens
 	if ap.GetDeletionTimestamp() != nil && controllerutil.ContainsFinalizer(&ap, authPolicyFinalizer) {
 		logger.V(1).Info("Handling removal of authpolicy object")
 		if err := r.removeIstioAuthPolicy(ctx, &ap); err != nil {
@@ -80,11 +83,22 @@ func (r *AuthPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
+	// TODO:
 	if !controllerutil.ContainsFinalizer(&ap, authPolicyFinalizer) {
 		controllerutil.AddFinalizer(&ap, authPolicyFinalizer)
 		if err := r.UpdateResource(ctx, &ap); client.IgnoreNotFound(err) != nil {
 			return ctrl.Result{Requeue: true}, err
 		}
+	}
+
+	// Validate AuthPolicy
+	if err := ap.Validate(); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Enforce hierarchical constraints on AuthPolicy
+	if err := r.enforceHierarchicalConstraints(ctx, &ap); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	specResult, specErr := r.reconcileSpec(ctx, &ap)
@@ -108,20 +122,20 @@ func (r *AuthPolicyReconciler) Reconcile(eventCtx context.Context, req ctrl.Requ
 		return statusResult, nil
 	}
 
-	logger.Info("successfully reconciling AuthPolicy")
+	logger.Info("Successfully reconciling AuthPolicy")
 	return ctrl.Result{}, nil
 }
 
 func (r *AuthPolicyReconciler) reconcileSpec(ctx context.Context, ap *apimv1alpha1.AuthPolicy) (ctrl.Result, error) {
-	if err := ap.Validate(); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.enforceHierarchicalConstraints(ctx, ap); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	if err := r.reconcileNetworkResourceBackReference(ctx, ap); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := r.updateIndex(ctx, ap); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := r.reconcileIndex(ctx, ap); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -134,6 +148,58 @@ func (r *AuthPolicyReconciler) reconcileSpec(ctx context.Context, ap *apimv1alph
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *AuthPolicyReconciler) updateIndex(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
+	logger, _ := logr.FromContext(ctx)
+	apKey := client.ObjectKeyFromObject(ap)
+
+	if ap.Spec.Default == nil && ap.Spec.Override == nil {
+		logger.V(1).Info("AuthPolicy has no affect", "authpolicy", apKey.String())
+		return nil
+	}
+
+	// update the index
+	switch string(ap.Spec.TargetRef.Kind) {
+	case "HTTPRoute":
+		if ap.Spec.Override != nil {
+			return fmt.Errorf("Overriding routes is not supported")
+		}
+		for _, host := range ap.Spec.Default.AuthScheme.Hosts {
+			if !r.Index.Set(host, apKey.String(), index.ROUTE_DEFAULT) {
+				logger.V(1).Info("Route default already present for given host", "host", host)
+			}
+		}
+		break
+	case "Gateway":
+		if ap.Spec.Override != nil {
+			for _, host := range ap.Spec.Override.AuthScheme.Hosts {
+				if !r.Index.Set(host, apKey.String(), index.GATEWAY_OVERRIDE) {
+					logger.V(1).Info("Gateway override is already present for given host", "host", host)
+				}
+			}
+		} else {
+			for _, host := range ap.Spec.Default.AuthScheme.Hosts {
+				if !r.Index.Set(host, apKey.String(), index.GATEWAY_DEFAULT) {
+					logger.V(1).Info("Gateway default is already present for given host", "host", host)
+				}
+			}
+		}
+		break
+	}
+	return nil
+}
+
+// reconcileIndex reconciles kubernetes objectes using state of the index
+func (r *AuthPolicyReconciler) reconcileIndex(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
+	hosts := ap.GetHosts()
+	for _, host := range hosts {
+		parentNode := r.Index.GetParent(host)
+
+		parentNode.GetCreateAndDeleteObjects()
+
+	}
+	return nil
 }
 
 func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
@@ -159,7 +225,17 @@ func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Contex
 
 	logger.V(1).Info("constraining hostnames", "hostnames", constrainingHosts)
 
-	for ruleIdx, rule := range ap.Spec.AuthRules {
+	var authRules []*apimv1alpha1.AuthRule
+	var authScheme *authorinov1beta1.AuthConfigSpec
+	if ap.Spec.Override != nil {
+		authRules = ap.Spec.Override.AuthRules
+		authScheme = ap.Spec.Override.AuthScheme
+	} else {
+		authRules = ap.Spec.Default.AuthRules
+		authScheme = ap.Spec.Default.AuthScheme
+	}
+
+	for ruleIdx, rule := range authRules {
 		for _, host := range rule.Hosts {
 			isSubsetHost := len(constrainingHosts) == 0 // When target object is Gateway, constraining hosts are zero.
 			for _, constraint := range constrainingHosts {
@@ -174,7 +250,7 @@ func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Contex
 		}
 	}
 
-	for _, host := range ap.Spec.AuthScheme.Hosts {
+	for _, host := range authScheme.Hosts {
 		isSubsetHost := len(constrainingHosts) == 0
 		for _, constraint := range constrainingHosts {
 			if strings.HasSuffix(host, constraint) {

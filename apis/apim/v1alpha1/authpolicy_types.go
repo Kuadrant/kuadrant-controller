@@ -16,6 +16,12 @@ type AuthPolicySpec struct {
 	// TargetRef identifies an API object to apply policy to.
 	TargetRef gatewayapiv1alpha2.PolicyTargetReference `json:"targetRef"`
 
+	Default *AuthPolicyBody `json:"default"`
+
+	Override *AuthPolicyBody `json:"override"`
+}
+
+type AuthPolicyBody struct {
 	// Rule describe the requests that will be routed to external authorization provider
 	AuthRules []*AuthRule `json:"rules,omitempty"`
 
@@ -102,4 +108,25 @@ func (ap *AuthPolicy) Validate() error {
 		return fmt.Errorf("invalid targetRef.Namespace %s. Currently only supporting references to the same namespace", *ap.Spec.TargetRef.Namespace)
 	}
 	return nil
+}
+
+// Retrieves unique hostnames present in AuthScheme of override and default
+func (ap *AuthPolicy) GetHosts() []string {
+	uniqueHosts := make(map[string]bool) // get unique host names
+	if ap.Spec.Override != nil {
+		for _, host := range ap.Spec.Override.AuthScheme.Hosts {
+			uniqueHosts[host] = true
+		}
+	}
+	if ap.Spec.Default != nil {
+		for _, host := range ap.Spec.Default.AuthScheme.Hosts {
+			uniqueHosts[host] = true
+		}
+	}
+
+	hosts := []string{}
+	for host, _ := range uniqueHosts {
+		hosts = append(hosts, host)
+	}
+	return hosts
 }

@@ -43,6 +43,7 @@ import (
 	apimv1alpha1 "github.com/kuadrant/kuadrant-controller/apis/apim/v1alpha1"
 	apimcontrollers "github.com/kuadrant/kuadrant-controller/controllers/apim"
 	"github.com/kuadrant/kuadrant-controller/pkg/common"
+	"github.com/kuadrant/kuadrant-controller/pkg/index"
 	"github.com/kuadrant/kuadrant-controller/pkg/log"
 	"github.com/kuadrant/kuadrant-controller/pkg/reconcilers"
 	"github.com/kuadrant/kuadrant-controller/version"
@@ -137,6 +138,7 @@ func main() {
 	if err = (&apimcontrollers.AuthPolicyReconciler{
 		BaseReconciler: authPolicyBaseReconciler,
 		Scheme:         mgr.GetScheme(),
+		Index:          index.NewIndex(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)
