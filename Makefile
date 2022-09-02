@@ -82,15 +82,6 @@ help: ## Display this help.
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	$(MAKE) deploy-manifest
-
-.PHONY: deploy-manifest
-deploy-manifest: kustomize ## Generate deployment manifests.
-	mkdir -p $(PROJECT_DIR)/config/deploy
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/default > $(PROJECT_DIR)/config/deploy/manifests.yaml
-	# clean up
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(DEFAULT_IMG)
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
