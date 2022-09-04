@@ -40,8 +40,8 @@ metadata:
     app: toystore
 spec:
   parentRefs:
-    - name: kuadrant-gwapi-gateway
-      namespace: kuadrant-system
+    - name: istio-ingressgateway
+      namespace: istio-system
   hostnames: ["*.toystore.com"]
   rules:
     - matches:
@@ -79,7 +79,7 @@ while :; do curl --write-out '%{http_code}' --silent --output /dev/null -H "Host
 you may need to forward ports
 
 ```bash
-kubectl port-forward -n kuadrant-system service/kuadrant-gateway 9080:80
+kubectl port-forward -n istio-system service/istio-ingressgateway 9080:80
 ```
 
 ### Rate limiting `toystore` HTTPRoute traffic
@@ -178,12 +178,12 @@ apiVersion: apim.kuadrant.io/v1alpha1
 kind: RateLimitPolicy
 metadata:
   name: kuadrant-gw
-  namespace: kuadrant-system
+  namespace: istio-system
 spec:
   targetRef:
     group: gateway.networking.k8s.io
     kind: Gateway
-    name: kuadrant-gwapi-gateway
+    name: istio-ingressgateway
   rateLimits:
     - rules:
       - methods: ["POST"]
