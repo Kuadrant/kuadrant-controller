@@ -59,7 +59,7 @@ jobs:
           kubectl cluster-info dump
       - name: Deploy Kuadrant deps
         run: |
-          make deploy-kuadrant-deps
+          make local-env-setup
       - name: run tests
         run: |
           make test-integration
