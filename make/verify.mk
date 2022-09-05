@@ -10,4 +10,4 @@ verify-manifests: manifests ## Verify manifests update.
 
 .PHONY: verify-fmt
 verify-fmt: fmt ## Verify fmt update.
-	git diff --exit-code ./api ./controllers
+	git diff --exit-code ./apis ./controllers
