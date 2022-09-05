@@ -113,11 +113,11 @@ spec:
       configurations:
         - actions:
             - generic_key:
-                descriptor_key: admin-operation
+                descriptor_key: admin_operation
                 descriptor_value: "1"
       limits:
         - conditions:
-            - "admin-operation == 1"
+            - "admin_operation == 1"
           maxValue: 5
           seconds: 10
           variables: []
@@ -127,11 +127,11 @@ spec:
       configurations:
         - actions:
             - generic_key:
-                descriptor_key: get-operation
+                descriptor_key: get_operation
                 descriptor_value: "1"
       limits:
         - conditions:
-            - "get-operation == 1"
+            - "get_operation == 1"
           maxValue: 8
           seconds: 10
           variables: []
@@ -190,10 +190,10 @@ spec:
       configurations:
         - actions:
             - generic_key:
-                descriptor_key: expensive-op
+                descriptor_key: expensive_op
                 descriptor_value: "1"
       limits:
-        - conditions: ["expensive-op == 1"]
+        - conditions: ["expensive_op == 1"]
           maxValue: 2
           seconds: 10
           variables: []
