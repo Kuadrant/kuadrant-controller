@@ -65,10 +65,7 @@ func (r *RateLimitPolicyReconciler) computeFinalizeGatewayDiff(ctx context.Conte
 		LeftGateways: nil,
 	}
 
-	var rlpGwKeys []client.ObjectKey
-	var err error
-
-	rlpGwKeys, err = r.rlpGatewayKeys(ctx, rlp)
+	rlpGwKeys, err := r.rlpGatewayKeys(ctx, rlp)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
