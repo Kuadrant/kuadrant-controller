@@ -418,14 +418,23 @@ func (r *RateLimitPolicyReconciler) validateHTTPRoute(ctx context.Context, rlp *
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RateLimitPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	HTTPRouteEventMapper := &HTTPRouteEventMapper{
-		Logger: r.Logger().WithName("httpRouteHandler"),
+	httpRouteEventMapper := &HTTPRouteEventMapper{
+		Logger: r.Logger().WithName("httpRouteEventMapper"),
+	}
+	gatewayEventMapper := &GatewayEventMapper{
+		Logger: r.Logger().WithName("gatewayEventMapper"),
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apimv1alpha1.RateLimitPolicy{}).
 		Watches(
 			&source.Kind{Type: &gatewayapiv1alpha2.HTTPRoute{}},
-			handler.EnqueueRequestsFromMapFunc(HTTPRouteEventMapper.MapToRateLimitPolicy),
+			handler.EnqueueRequestsFromMapFunc(httpRouteEventMapper.MapToRateLimitPolicy),
+		).
+		// Currently the purpose is to generate events when rlp references change in gateways
+		// so the status of the rlps targeting a route can be keep in sync
+		Watches(
+			&source.Kind{Type: &gatewayapiv1alpha2.Gateway{}},
+			handler.EnqueueRequestsFromMapFunc(gatewayEventMapper.MapToRateLimitPolicy),
 		).
 		Complete(r)
 }
