@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,7 +50,7 @@ func (r *RateLimitPolicyReconciler) reconcileStatus(ctx context.Context, rlp *ap
 	logger.V(1).Info("Updating Status", "err", updateErr)
 	if updateErr != nil {
 		// Ignore conflicts, resource might just be outdated.
-		if errors.IsConflict(updateErr) {
+		if apierrors.IsConflict(updateErr) {
 			logger.Info("Failed to update status: resource might just be outdated")
 			return reconcile.Result{Requeue: true}, nil
 		}
