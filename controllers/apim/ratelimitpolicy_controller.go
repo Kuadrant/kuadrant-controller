@@ -424,6 +424,10 @@ func (r *RateLimitPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	gatewayEventMapper := &GatewayEventMapper{
 		Logger: r.Logger().WithName("gatewayEventMapper"),
 	}
+	gatewayRateLimtPolicyEventMapper := &GatewayRateLimitPolicyEventMapper{
+		Logger: r.Logger().WithName("gatewayRateLimitPolicyEventMapper"),
+		Client: r.Client(),
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apimv1alpha1.RateLimitPolicy{}).
 		Watches(
@@ -435,6 +439,11 @@ func (r *RateLimitPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &gatewayapiv1alpha2.Gateway{}},
 			handler.EnqueueRequestsFromMapFunc(gatewayEventMapper.MapToRateLimitPolicy),
+		).
+		// When gateway level RLP changes, notify route level RLP's
+		Watches(
+			&source.Kind{Type: &apimv1alpha1.RateLimitPolicy{}},
+			handler.EnqueueRequestsFromMapFunc(gatewayRateLimtPolicyEventMapper.MapRouteRateLimitPolicy),
 		).
 		Complete(r)
 }
