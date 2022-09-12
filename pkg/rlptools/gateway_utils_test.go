@@ -56,6 +56,7 @@ func TestRulesFromHTTPRoute(t *testing.T) {
 		getMethod                                          = "GET"
 		catsPath                                           = "/cats"
 		dogsPath                                           = "/dogs"
+		rabbitsPath                                        = "/rabbits"
 		getHTTPMethod        gatewayapiv1alpha2.HTTPMethod = "GET"
 		postHTTPMethod       gatewayapiv1alpha2.HTTPMethod = "POST"
 		pathPrefix                                         = gatewayapiv1alpha2.PathMatchPathPrefix
@@ -67,6 +68,9 @@ func TestRulesFromHTTPRoute(t *testing.T) {
 		dogsExactPatchMatch = gatewayapiv1alpha2.HTTPPathMatch{
 			Type:  &pathExact,
 			Value: &dogsPath,
+		}
+		rabbitsPrefixPatchMatch = gatewayapiv1alpha2.HTTPPathMatch{
+			Value: &rabbitsPath,
 		}
 	)
 
@@ -138,6 +142,26 @@ func TestRulesFromHTTPRoute(t *testing.T) {
 			[]apimv1alpha1.Rule{{
 				Hosts: []string{"*"},
 				Paths: []string{"/cats*"},
+			}},
+		},
+		{
+			"with path and default path match type",
+			&gatewayapiv1alpha2.HTTPRoute{
+				Spec: gatewayapiv1alpha2.HTTPRouteSpec{
+					Rules: []gatewayapiv1alpha2.HTTPRouteRule{
+						{
+							Matches: []gatewayapiv1alpha2.HTTPRouteMatch{
+								{
+									Path: &rabbitsPrefixPatchMatch,
+								},
+							},
+						},
+					},
+				},
+			},
+			[]apimv1alpha1.Rule{{
+				Hosts: []string{"*"},
+				Paths: []string{"/rabbits*"},
 			}},
 		},
 		{

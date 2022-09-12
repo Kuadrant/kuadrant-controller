@@ -281,16 +281,11 @@ func routePathMatchToRulePath(pathMatch *gatewayapiv1alpha2.HTTPPathMatch) []str
 		return nil
 	}
 
+	// Exact path match
 	suffix := ""
-	if pathMatch.Type == nil {
+	if pathMatch.Type == nil || *pathMatch.Type == gatewayapiv1alpha2.PathMatchPathPrefix {
 		// defaults to path prefix match type
 		suffix = "*"
-	}
-	if *pathMatch.Type == gatewayapiv1alpha2.PathMatchPathPrefix {
-		suffix = "*"
-	}
-	if *pathMatch.Type == gatewayapiv1alpha2.PathMatchExact {
-		suffix = ""
 	}
 
 	val := "/"
