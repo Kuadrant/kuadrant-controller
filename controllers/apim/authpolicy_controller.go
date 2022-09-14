@@ -3,7 +3,6 @@ package apim
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	authorinov1beta1 "github.com/kuadrant/authorino/api/v1beta1"
@@ -137,55 +136,47 @@ func (r *AuthPolicyReconciler) reconcileSpec(ctx context.Context, ap *apimv1alph
 }
 
 func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Context, ap *apimv1alpha1.AuthPolicy) error {
-	logger, _ := logr.FromContext(ctx)
 	targetObj, err := r.fetchTargetObject(ctx, ap)
 	if err != nil {
 		return err
 	}
 
-	constrainingHosts := []string{}
-	if hr, isHR := targetObj.(*gatewayapiv1alpha2.HTTPRoute); isHR {
-		for idx := range hr.Spec.Hostnames {
-			hostname := string(hr.Spec.Hostnames[idx])
-			if len(hostname) != 0 && hostname[0] == '*' {
-				// Follows https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1alpha2.Hostname
-				trimmedHost := strings.Trim(hostname, "*")
-				constrainingHosts = append(constrainingHosts, trimmedHost)
-			} else {
-				constrainingHosts = append(constrainingHosts, hostname)
+	netResourceHosts := make([]string, 0)
+	switch netResource := targetObj.(type) {
+	case *gatewayapiv1alpha2.HTTPRoute:
+		for _, hostname := range netResource.Spec.Hostnames {
+			netResourceHosts = append(netResourceHosts, string(hostname))
+		}
+	case *gatewayapiv1alpha2.Gateway:
+		for idx := range netResource.Spec.Listeners {
+			if netResource.Spec.Listeners[idx].Hostname != nil {
+				netResourceHosts = append(netResourceHosts, string(*netResource.Spec.Listeners[idx].Hostname))
 			}
 		}
 	}
 
-	logger.V(1).Info("constraining hostnames", "hostnames", constrainingHosts)
-
-	for ruleIdx, rule := range ap.Spec.AuthRules {
-		for _, host := range rule.Hosts {
-			isSubsetHost := len(constrainingHosts) == 0 // When target object is Gateway, constraining hosts are zero.
-			for _, constraint := range constrainingHosts {
-				if strings.HasSuffix(host, constraint) {
-					isSubsetHost = true
-					break
-				}
-			}
-			if !isSubsetHost {
-				return fmt.Errorf("rule #%d host (%s) does not follow any hierarchical constraints", ruleIdx+1, host)
-			}
-		}
+	if len(netResourceHosts) == 0 {
+		netResourceHosts = append(netResourceHosts, string("*"))
 	}
 
+	ruleHosts := make([]string, 0)
+	for _, rule := range ap.Spec.AuthRules {
+		ruleHosts = append(ruleHosts, rule.Hosts...)
+	}
+
+	if valid, invalidHost := common.ValidSubdomains(netResourceHosts, ruleHosts); !valid {
+		return fmt.Errorf("rule host (%s) does not follow any hierarchical constraints", invalidHost)
+	}
+
+	authSchemeHosts := make([]string, 0)
 	for _, host := range ap.Spec.AuthScheme.Hosts {
-		isSubsetHost := len(constrainingHosts) == 0
-		for _, constraint := range constrainingHosts {
-			if strings.HasSuffix(host, constraint) {
-				isSubsetHost = true
-				break
-			}
-		}
-		if !isSubsetHost {
-			return fmt.Errorf("host defined in authscheme (%s) does not follow any hierarchical constraints", host)
-		}
+		authSchemeHosts = append(authSchemeHosts, host)
 	}
+
+	if valid, invalidHost := common.ValidSubdomains(netResourceHosts, authSchemeHosts); !valid {
+		return fmt.Errorf("host defined in authscheme (%s) does not follow any hierarchical constraints", invalidHost)
+	}
+
 	return nil
 }
 
