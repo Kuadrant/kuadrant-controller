@@ -145,6 +145,11 @@ func (r *RateLimitPolicyReconciler) reconcileSpec(ctx context.Context, rlp *apim
 		return ctrl.Result{}, err
 	}
 
+	err = r.validateRuleHosts(ctx, rlp)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	err = r.validateHTTPRoute(ctx, rlp)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -378,6 +383,58 @@ func (r *RateLimitPolicyReconciler) gatewayRefListFromHTTPRoute(httpRoute *gatew
 	}
 
 	return gwKeys
+}
+
+func (r *RateLimitPolicyReconciler) validateRuleHosts(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
+	var netObj client.Object
+	var err error
+
+	if rlp.IsForGateway() {
+		netObj, err = r.fetchGateway(ctx, rlp)
+		if err != nil {
+			// The object should also exist
+			return err
+		}
+	} else if rlp.IsForHTTPRoute() {
+		netObj, err = r.fetchHTTPRoute(ctx, rlp)
+		if err != nil {
+			// The object should also exist
+			return err
+		}
+	} else {
+		return errors.New("validateRuleHosts: rlp targeting unknown network resource")
+	}
+
+	netResourceHosts := make([]string, 0)
+	switch netResource := netObj.(type) {
+	case *gatewayapiv1alpha2.HTTPRoute:
+		for _, hostname := range netResource.Spec.Hostnames {
+			netResourceHosts = append(netResourceHosts, string(hostname))
+		}
+	case *gatewayapiv1alpha2.Gateway:
+		for idx := range netResource.Spec.Listeners {
+			if netResource.Spec.Listeners[idx].Hostname != nil {
+				netResourceHosts = append(netResourceHosts, string(*netResource.Spec.Listeners[idx].Hostname))
+			}
+		}
+	}
+
+	if len(netResourceHosts) == 0 {
+		netResourceHosts = append(netResourceHosts, string("*"))
+	}
+
+	ruleHosts := make([]string, 0)
+	for idx := range rlp.Spec.RateLimits {
+		for ruleIdx := range rlp.Spec.RateLimits[idx].Rules {
+			ruleHosts = append(ruleHosts, rlp.Spec.RateLimits[idx].Rules[ruleIdx].Hosts...)
+		}
+	}
+
+	if valid, invalidHost := common.ValidSubdomains(netResourceHosts, ruleHosts); !valid {
+		return fmt.Errorf("rule host (%s) not valid", invalidHost)
+	}
+
+	return nil
 }
 
 func (r *RateLimitPolicyReconciler) validateHTTPRoute(ctx context.Context, rlp *apimv1alpha1.RateLimitPolicy) error {
