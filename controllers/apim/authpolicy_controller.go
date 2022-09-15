@@ -168,12 +168,7 @@ func (r *AuthPolicyReconciler) enforceHierarchicalConstraints(ctx context.Contex
 		return fmt.Errorf("rule host (%s) does not follow any hierarchical constraints", invalidHost)
 	}
 
-	authSchemeHosts := make([]string, 0)
-	for _, host := range ap.Spec.AuthScheme.Hosts {
-		authSchemeHosts = append(authSchemeHosts, host)
-	}
-
-	if valid, invalidHost := common.ValidSubdomains(netResourceHosts, authSchemeHosts); !valid {
+	if valid, invalidHost := common.ValidSubdomains(netResourceHosts, ap.Spec.AuthScheme.Hosts); !valid {
 		return fmt.Errorf("host defined in authscheme (%s) does not follow any hierarchical constraints", invalidHost)
 	}
 
