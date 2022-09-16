@@ -224,7 +224,7 @@ func (r *AuthPolicyReconciler) reconcileAuthRules(ctx context.Context, ap *apimv
 	}
 
 	targetObjectKind := "Gateway"
-	if common.IsHTTPRoute(ap.Spec.TargetRef) {
+	if common.IsTargetRefHTTPRoute(ap.Spec.TargetRef) {
 		targetObjectKind = "HTTPRoute"
 	}
 
@@ -300,7 +300,7 @@ func (r *AuthPolicyReconciler) removeIstioAuthPolicy(ctx context.Context, ap *ap
 	}
 
 	targetObjectKind := "Gateway"
-	if common.IsHTTPRoute(ap.Spec.TargetRef) {
+	if common.IsTargetRefHTTPRoute(ap.Spec.TargetRef) {
 		targetObjectKind = "HTTPRoute"
 	}
 

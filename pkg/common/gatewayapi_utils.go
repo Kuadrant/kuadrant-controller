@@ -10,11 +10,11 @@ type HTTPRouteRule struct {
 	Hosts   []string
 }
 
-func IsHTTPRoute(targetRef gatewayapiv1alpha2.PolicyTargetReference) bool {
+func IsTargetRefHTTPRoute(targetRef gatewayapiv1alpha2.PolicyTargetReference) bool {
 	return targetRef.Kind == gatewayapiv1alpha2.Kind("HTTPRoute")
 }
 
-func IsGateway(targetRef gatewayapiv1alpha2.PolicyTargetReference) bool {
+func IsTargetRefGateway(targetRef gatewayapiv1alpha2.PolicyTargetReference) bool {
 	return targetRef.Kind == gatewayapiv1alpha2.Kind("Gateway")
 }
 

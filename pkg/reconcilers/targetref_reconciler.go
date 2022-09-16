@@ -104,9 +104,9 @@ func (r *TargetRefReconciler) FetchValidTargetRef(ctx context.Context, targetRef
 
 	objKey := client.ObjectKey{Name: string(targetRef.Name), Namespace: tmpNS}
 
-	if common.IsHTTPRoute(targetRef) {
+	if common.IsTargetRefHTTPRoute(targetRef) {
 		return r.FetchValidHTTPRoute(ctx, objKey)
-	} else if common.IsGateway(targetRef) {
+	} else if common.IsTargetRefGateway(targetRef) {
 		return r.FetchValidGateway(ctx, objKey)
 	}
 
@@ -117,7 +117,7 @@ func (r *TargetRefReconciler) FetchValidTargetRef(ctx context.Context, targetRef
 func (r *TargetRefReconciler) TargetedGatewayKeys(ctx context.Context, targetRef gatewayapiv1alpha2.PolicyTargetReference, defaultNs string) ([]client.ObjectKey, error) {
 	gwKeys := make([]client.ObjectKey, 0)
 
-	if common.IsHTTPRoute(targetRef) {
+	if common.IsTargetRefHTTPRoute(targetRef) {
 		tmpNS := defaultNs
 		if targetRef.Namespace != nil {
 			tmpNS = string(*targetRef.Namespace)
@@ -135,7 +135,7 @@ func (r *TargetRefReconciler) TargetedGatewayKeys(ctx context.Context, targetRef
 			}
 			gwKeys = append(gwKeys, gwKey)
 		}
-	} else if common.IsGateway(targetRef) {
+	} else if common.IsTargetRefGateway(targetRef) {
 		gwKey := client.ObjectKey{Name: string(targetRef.Name), Namespace: defaultNs}
 		if targetRef.Namespace != nil {
 			gwKey.Namespace = string(*targetRef.Namespace)
