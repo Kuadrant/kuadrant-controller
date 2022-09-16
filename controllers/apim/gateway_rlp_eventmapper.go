@@ -14,7 +14,8 @@ import (
 	"github.com/kuadrant/kuadrant-controller/pkg/rlptools"
 )
 
-// GatewayEventMapper is an EventHandler that maps Gateway object events to policy events.
+// GatewayRateLimitPolicyEventMapper is an EventHandler that maps:
+// RLP events targeting a Gateway TO all the RLPs configuring that same gateway
 type GatewayRateLimitPolicyEventMapper struct {
 	Logger logr.Logger
 	Client client.Client

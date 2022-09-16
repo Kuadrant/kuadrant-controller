@@ -126,12 +126,11 @@ func (r *RateLimitPolicyReconciler) gatewaysRateLimits(ctx context.Context, rlp 
 			return nil, err
 		}
 
-		gwAnnotations := gw.GetAnnotations()
-		if gwAnnotations == nil {
-			gwAnnotations = map[string]string{}
+		if gw.GetAnnotations() == nil {
+			continue
 		}
 
-		if rlpKeyStr, ok := gwAnnotations[common.RateLimitPolicyBackRefAnnotation]; ok {
+		if rlpKeyStr, ok := gw.GetAnnotations()[common.RateLimitPolicyBackRefAnnotation]; ok {
 			rlpKey, err := common.UnMarshallObjectKey(rlpKeyStr)
 			if err != nil {
 				logger.V(1).Info("gatewaysRateLimits", "cannot parse rlp back ref key", rlpKey, "err", err)
