@@ -188,3 +188,488 @@ func TestFetchValidHTTPRoute(t *testing.T) {
 		t.Fatal("res spec not as expected")
 	}
 }
+
+func TestFetchValidTargetRef(t *testing.T) {
+	var (
+		namespace = "operator-unittest"
+		routeName = "my-route"
+	)
+	baseCtx := context.Background()
+	ctx := logr.NewContext(baseCtx, log.Log)
+
+	s := scheme.Scheme
+	err := appsv1.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gatewayapiv1alpha2.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetRef := gatewayapiv1alpha2.PolicyTargetReference{
+		Group: "gateway.networking.k8s.io",
+		Kind:  "HTTPRoute",
+		Name:  gatewayapiv1alpha2.ObjectName(routeName),
+	}
+
+	existingRoute := &gatewayapiv1alpha2.HTTPRoute{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			Kind:       "HTTPRoute",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      routeName,
+			Namespace: namespace,
+		},
+		Spec: gatewayapiv1alpha2.HTTPRouteSpec{
+			CommonRouteSpec: gatewayapiv1alpha2.CommonRouteSpec{
+				ParentRefs: []gatewayapiv1alpha2.ParentRef{
+					{
+						Name: "gwName",
+					},
+				},
+			},
+		},
+		Status: gatewayapiv1alpha2.HTTPRouteStatus{
+			RouteStatus: gatewayapiv1alpha2.RouteStatus{
+				Parents: []gatewayapiv1alpha2.RouteParentStatus{
+					{
+						ParentRef: gatewayapiv1alpha2.ParentRef{
+							Name: "gwName",
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   "Accepted",
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Objects to track in the fake client.
+	objs := []runtime.Object{existingRoute}
+
+	// Create a fake client to mock API calls.
+	cl := fake.NewFakeClient(objs...)
+	clientAPIReader := fake.NewFakeClient(objs...)
+	recorder := record.NewFakeRecorder(1000)
+
+	baseReconciler := NewBaseReconciler(cl, s, clientAPIReader, log.Log, recorder)
+	targetRefReconciler := TargetRefReconciler{
+		BaseReconciler: baseReconciler,
+	}
+
+	res, err := targetRefReconciler.FetchValidTargetRef(ctx, targetRef, namespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res == nil {
+		t.Fatal("res is nil")
+	}
+
+	switch obj := res.(type) {
+	case *gatewayapiv1alpha2.HTTPRoute:
+		if !reflect.DeepEqual(obj.Spec, existingRoute.Spec) {
+			t.Fatal("res spec not as expected")
+		}
+	default:
+		t.Fatal("res type not known")
+	}
+}
+
+func TestReconcileTargetBackReference(t *testing.T) {
+	var (
+		namespace             = "operator-unittest"
+		routeName             = "my-route"
+		annotationName string = "some-annotation"
+	)
+	baseCtx := context.Background()
+	ctx := logr.NewContext(baseCtx, log.Log)
+
+	s := scheme.Scheme
+	err := appsv1.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gatewayapiv1alpha2.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetRef := gatewayapiv1alpha2.PolicyTargetReference{
+		Group: "gateway.networking.k8s.io",
+		Kind:  "HTTPRoute",
+		Name:  gatewayapiv1alpha2.ObjectName(routeName),
+	}
+
+	policyKey := client.ObjectKey{Name: "someName", Namespace: "someNamespace"}
+
+	existingRoute := &gatewayapiv1alpha2.HTTPRoute{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			Kind:       "HTTPRoute",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      routeName,
+			Namespace: namespace,
+		},
+		Spec: gatewayapiv1alpha2.HTTPRouteSpec{
+			CommonRouteSpec: gatewayapiv1alpha2.CommonRouteSpec{
+				ParentRefs: []gatewayapiv1alpha2.ParentRef{
+					{
+						Name: "gwName",
+					},
+				},
+			},
+		},
+		Status: gatewayapiv1alpha2.HTTPRouteStatus{
+			RouteStatus: gatewayapiv1alpha2.RouteStatus{
+				Parents: []gatewayapiv1alpha2.RouteParentStatus{
+					{
+						ParentRef: gatewayapiv1alpha2.ParentRef{
+							Name: "gwName",
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   "Accepted",
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Objects to track in the fake client.
+	objs := []runtime.Object{existingRoute}
+
+	// Create a fake client to mock API calls.
+	cl := fake.NewFakeClient(objs...)
+	clientAPIReader := fake.NewFakeClient(objs...)
+	recorder := record.NewFakeRecorder(1000)
+
+	baseReconciler := NewBaseReconciler(cl, s, clientAPIReader, log.Log, recorder)
+	targetRefReconciler := TargetRefReconciler{
+		BaseReconciler: baseReconciler,
+	}
+
+	err = targetRefReconciler.ReconcileTargetBackReference(ctx, policyKey, targetRef,
+		namespace, annotationName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res := &gatewayapiv1alpha2.HTTPRoute{}
+	err = cl.Get(ctx, client.ObjectKey{Name: routeName, Namespace: namespace}, res)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res == nil {
+		t.Fatal("res is nil")
+	}
+
+	if len(res.GetAnnotations()) == 0 {
+		t.Fatal("annotations are empty")
+	}
+
+	val, ok := res.GetAnnotations()[annotationName]
+	if !ok {
+		t.Fatal("expected annotation not found")
+	}
+
+	if val != policyKey.String() {
+		t.Fatalf("annotation value (%s) does not match expected (%s)", val, policyKey.String())
+	}
+}
+
+func TestTargetedGatewayKeys(t *testing.T) {
+	var (
+		namespace = "operator-unittest"
+		routeName = "my-route"
+	)
+	baseCtx := context.Background()
+	ctx := logr.NewContext(baseCtx, log.Log)
+
+	s := scheme.Scheme
+	err := appsv1.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gatewayapiv1alpha2.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetRef := gatewayapiv1alpha2.PolicyTargetReference{
+		Group: "gateway.networking.k8s.io",
+		Kind:  "HTTPRoute",
+		Name:  gatewayapiv1alpha2.ObjectName(routeName),
+	}
+
+	existingRoute := &gatewayapiv1alpha2.HTTPRoute{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			Kind:       "HTTPRoute",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      routeName,
+			Namespace: namespace,
+		},
+		Spec: gatewayapiv1alpha2.HTTPRouteSpec{
+			CommonRouteSpec: gatewayapiv1alpha2.CommonRouteSpec{
+				ParentRefs: []gatewayapiv1alpha2.ParentRef{
+					{
+						Name: "gwName",
+					},
+				},
+			},
+		},
+		Status: gatewayapiv1alpha2.HTTPRouteStatus{
+			RouteStatus: gatewayapiv1alpha2.RouteStatus{
+				Parents: []gatewayapiv1alpha2.RouteParentStatus{
+					{
+						ParentRef: gatewayapiv1alpha2.ParentRef{
+							Name: "gwName",
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   "Accepted",
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Objects to track in the fake client.
+	objs := []runtime.Object{existingRoute}
+
+	// Create a fake client to mock API calls.
+	cl := fake.NewFakeClient(objs...)
+	clientAPIReader := fake.NewFakeClient(objs...)
+	recorder := record.NewFakeRecorder(1000)
+
+	baseReconciler := NewBaseReconciler(cl, s, clientAPIReader, log.Log, recorder)
+	targetRefReconciler := TargetRefReconciler{
+		BaseReconciler: baseReconciler,
+	}
+
+	res, err := targetRefReconciler.TargetedGatewayKeys(ctx, targetRef, namespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res) != 1 {
+		t.Fatalf("gateway key slice length is %d and it was expected to be 1", len(res))
+	}
+
+	expectedKey := client.ObjectKey{Name: "gwName", Namespace: namespace}
+
+	if res[0] != expectedKey {
+		t.Fatalf("gwKey value (%+v) does not match expected (%+v)", res[0], expectedKey)
+	}
+}
+
+func TestTargetHostnames(t *testing.T) {
+	var (
+		namespace = "operator-unittest"
+		routeName = "my-route"
+	)
+	baseCtx := context.Background()
+	ctx := logr.NewContext(baseCtx, log.Log)
+
+	s := scheme.Scheme
+	err := appsv1.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gatewayapiv1alpha2.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetRef := gatewayapiv1alpha2.PolicyTargetReference{
+		Group: "gateway.networking.k8s.io",
+		Kind:  "HTTPRoute",
+		Name:  gatewayapiv1alpha2.ObjectName(routeName),
+	}
+
+	existingRoute := &gatewayapiv1alpha2.HTTPRoute{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			Kind:       "HTTPRoute",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      routeName,
+			Namespace: namespace,
+		},
+		Spec: gatewayapiv1alpha2.HTTPRouteSpec{
+			Hostnames: []gatewayapiv1alpha2.Hostname{"*.com", "*.net"},
+			CommonRouteSpec: gatewayapiv1alpha2.CommonRouteSpec{
+				ParentRefs: []gatewayapiv1alpha2.ParentRef{
+					{
+						Name: "gwName",
+					},
+				},
+			},
+		},
+		Status: gatewayapiv1alpha2.HTTPRouteStatus{
+			RouteStatus: gatewayapiv1alpha2.RouteStatus{
+				Parents: []gatewayapiv1alpha2.RouteParentStatus{
+					{
+						ParentRef: gatewayapiv1alpha2.ParentRef{
+							Name: "gwName",
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   "Accepted",
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Objects to track in the fake client.
+	objs := []runtime.Object{existingRoute}
+
+	// Create a fake client to mock API calls.
+	cl := fake.NewFakeClient(objs...)
+	clientAPIReader := fake.NewFakeClient(objs...)
+	recorder := record.NewFakeRecorder(1000)
+
+	baseReconciler := NewBaseReconciler(cl, s, clientAPIReader, log.Log, recorder)
+	targetRefReconciler := TargetRefReconciler{
+		BaseReconciler: baseReconciler,
+	}
+
+	res, err := targetRefReconciler.TargetHostnames(ctx, targetRef, namespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res) != 2 {
+		t.Fatalf("hostnames slice length is %d and it was expected to be 2", len(res))
+	}
+
+	expectedHostnames := []string{"*.com", "*.net"}
+
+	if !reflect.DeepEqual(res, expectedHostnames) {
+		t.Fatalf("hostnames value (%+v) does not match expected (%+v)", res, expectedHostnames)
+	}
+}
+
+func TestDeleteTargetBackReference(t *testing.T) {
+	var (
+		namespace             = "operator-unittest"
+		routeName             = "my-route"
+		annotationName string = "some-annotation"
+	)
+	baseCtx := context.Background()
+	ctx := logr.NewContext(baseCtx, log.Log)
+
+	s := scheme.Scheme
+	err := appsv1.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gatewayapiv1alpha2.AddToScheme(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetRef := gatewayapiv1alpha2.PolicyTargetReference{
+		Group: "gateway.networking.k8s.io",
+		Kind:  "HTTPRoute",
+		Name:  gatewayapiv1alpha2.ObjectName(routeName),
+	}
+
+	policyKey := client.ObjectKey{Name: "someName", Namespace: "someNamespace"}
+
+	existingRoute := &gatewayapiv1alpha2.HTTPRoute{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			Kind:       "HTTPRoute",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      routeName,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				annotationName: "annotationValue",
+			},
+		},
+		Spec: gatewayapiv1alpha2.HTTPRouteSpec{
+			CommonRouteSpec: gatewayapiv1alpha2.CommonRouteSpec{
+				ParentRefs: []gatewayapiv1alpha2.ParentRef{
+					{
+						Name: "gwName",
+					},
+				},
+			},
+		},
+		Status: gatewayapiv1alpha2.HTTPRouteStatus{
+			RouteStatus: gatewayapiv1alpha2.RouteStatus{
+				Parents: []gatewayapiv1alpha2.RouteParentStatus{
+					{
+						ParentRef: gatewayapiv1alpha2.ParentRef{
+							Name: "gwName",
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   "Accepted",
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Objects to track in the fake client.
+	objs := []runtime.Object{existingRoute}
+
+	// Create a fake client to mock API calls.
+	cl := fake.NewFakeClient(objs...)
+	clientAPIReader := fake.NewFakeClient(objs...)
+	recorder := record.NewFakeRecorder(1000)
+
+	baseReconciler := NewBaseReconciler(cl, s, clientAPIReader, log.Log, recorder)
+	targetRefReconciler := TargetRefReconciler{
+		BaseReconciler: baseReconciler,
+	}
+
+	err = targetRefReconciler.DeleteTargetBackReference(ctx, policyKey, targetRef,
+		namespace, annotationName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res := &gatewayapiv1alpha2.HTTPRoute{}
+	err = cl.Get(ctx, client.ObjectKey{Name: routeName, Namespace: namespace}, res)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res == nil {
+		t.Fatal("res is nil")
+	}
+
+	if len(res.GetAnnotations()) > 0 {
+		_, ok := res.GetAnnotations()[annotationName]
+		if ok {
+			t.Fatal("expected annotation found and it should have been deleted")
+		}
+	}
+}
