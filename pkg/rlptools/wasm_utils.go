@@ -50,7 +50,7 @@ func GatewayActionsFromRateLimitPolicy(rlp *apimv1alpha1.RateLimitPolicy, route 
 }
 
 func HTTPRouteRulesToRLPRules(httpRouteRules []common.HTTPRouteRule) []apimv1alpha1.Rule {
-	rlpRules := make([]apimv1alpha1.Rule, len(httpRouteRules))
+	rlpRules := make([]apimv1alpha1.Rule, 0, len(httpRouteRules))
 	for idx := range httpRouteRules {
 		var tmp []string
 		rlpRules = append(rlpRules, apimv1alpha1.Rule{

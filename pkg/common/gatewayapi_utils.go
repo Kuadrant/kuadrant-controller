@@ -57,16 +57,14 @@ func RulesFromHTTPRoute(route *gatewayapiv1alpha2.HTTPRoute) []HTTPRouteRule {
 			match := &route.Spec.Rules[routeRuleIdx].Matches[matchIdx]
 
 			rule := HTTPRouteRule{
-				Hosts: RouteHostnames(route),
+				Hosts:   RouteHostnames(route),
+				Methods: RouteHTTPMethodToRuleMethod(match.Method),
+				Paths:   routePathMatchToRulePath(match.Path),
 			}
-
-			rule.Methods = RouteHTTPMethodToRuleMethod(match.Method)
-			rule.Paths = routePathMatchToRulePath(match.Path)
 
 			if len(rule.Methods) != 0 || len(rule.Paths) != 0 {
 				// Only append rule when there are methods or path rules
 				// a valid rule must include HTTPRoute hostnames as well
-				rule.Hosts = RouteHostnames(route)
 				rules = append(rules, rule)
 			}
 		}
