@@ -122,8 +122,9 @@ var _ = BeforeSuite(func() {
 	)
 
 	err = (&RateLimitPolicyReconciler{
-		BaseReconciler: rateLimitPolicyBaseReconciler,
-		Scheme:         mgr.GetScheme(),
+		TargetRefReconciler: reconcilers.TargetRefReconciler{
+			BaseReconciler: rateLimitPolicyBaseReconciler,
+		},
 	}).SetupWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
