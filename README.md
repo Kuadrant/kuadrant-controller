@@ -1,3 +1,7 @@
+# 🛑 This repository is DEPRECATED!
+This project has been merged into [Kuadrant Operator](https://github.com/Kuadrant/kuadrant-operator/)
+<hr/>
+
 # Kuadrant Controller
 
 [![Code Style](https://github.com/Kuadrant/kuadrant-controller/actions/workflows/code-style.yaml/badge.svg)](https://github.com/Kuadrant/kuadrant-controller/actions/workflows/code-style.yaml)
