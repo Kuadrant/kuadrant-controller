@@ -119,10 +119,8 @@ spec:
     kind: HTTPRoute
     name: toystore
   rules:
-  - hosts: ["*.toystore.com"]
-    paths: ["/toy*"]
+  - paths: ["/toy*"]
   authScheme:
-    hosts: ["api.toystore.com"]
     identity:
     - name: friends
       apiKey:
